@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# VS Code
+.vscode
+
+# pienv
+pipfile
+pipfile.lock
+
+# Develop
+.flake8
+.isort.cfg
+.pytest.ini
