@@ -26,6 +26,16 @@ def find_nearest_number(
     Returns:
         (int | None): Если поиск безуспешен, возвращается значение None.
 
+    Example:
+        >>> find_nearest_number(273145)
+        271543
+
+        >>> find_nearest_number(273145, previous=False)
+        273154
+
+        >>> find_nearest_number(-273145)
+        -273154
+
     """
     # если входное значение невозможно представить как целое число, возвращаем None
     try:
