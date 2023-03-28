@@ -1,5 +1,6 @@
 import pytest
 
+#  ------------------- test_permutator ------------------------------------
 POSITION_PREV = "previous"
 POSITION_NEXT = "next"
 
@@ -100,3 +101,67 @@ def _get_numbers_list() -> list[dict]:
 )
 def fixture_numbers_list_int(request) -> dict:
     return request.param
+
+
+#  ------------------- test_count_items ------------------------------------
+_data_list: list = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a']
+
+
+@pytest.fixture(
+    name="data_list",
+    scope="module",
+)
+def fixture_data_list() -> list:
+    return _data_list
+
+
+def _get_data_items() -> list[str]:
+    return [str(val) for val in set(_data_list)]
+
+
+@pytest.fixture(
+    name="data_item",
+    params=_get_data_items(),
+    ids=lambda item: str(item),
+)
+def fixture_data_item(request) -> str:
+    return request.param
+
+
+_operations_list: list[str] = ['total', 'min', 'max', 'count']
+
+
+@pytest.fixture(
+    name="operation",
+    params=_operations_list,
+    ids=_operations_list,
+)
+def fixture_operations(request) -> str:
+    return request.param
+
+
+_data_results: dict = {
+    "0-total": 9,
+    "0-min": 1,
+    "0-max": 5,
+    "0-count": 4,
+    "1-total": 6,
+    "1-min": 1,
+    "1-max": 3,
+    "1-count": 4,
+    "2-total": 4,
+    "2-min": 4,
+    "2-max": 4,
+    "2-count": 1,
+    "a-total": 3,
+    "a-min": 3,
+    "a-max": 3,
+    "a-count": 1,
+}
+
+
+@pytest.fixture(
+    name="data_results",
+)
+def fixture_data_results() -> dict:
+    return _data_results
