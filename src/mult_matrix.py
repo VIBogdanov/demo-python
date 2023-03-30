@@ -7,7 +7,7 @@ def mult_matrix(
     matrix: list[list[Union[float, int]]],
     min_val: Union[float, int, None] = None,
     max_val: Union[float, int, None] = None,
-    default_val: Union[float, int] = 0.00,
+    default_val: Union[float, int] = 0.0,
 ) -> list[float]:
     """
     Функция получения вектора из двумерной матрицы путем перемножения
@@ -53,7 +53,7 @@ def mult_matrix(
     return [
         # если ни один элемент из строки не удовлетворяет ограничениям, возвращаем значение по-умолчанию
         # иначе перемножаем отфильтрованные значения
-        prod(mult_val) if mult_val else default_val
+        round(prod(mult_val), 3) if mult_val else default_val
         for mult_val in [[a_col for a_col in a_str if min_val <= a_col <= max_val] for a_str in matrix]
     ]
 

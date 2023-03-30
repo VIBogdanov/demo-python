@@ -50,12 +50,9 @@ def count_items(
         "count": lambda: len(dict_data.get(key, [0])),
         # ... возможно дальнейшее расширение списка операций
     }
-    # список уникальных элементов, которые будут выступать в качестве ключей
-    keys_list: list = [str(k) for k, _ in groupby(data_list)]
-    # количество элементов в каждой группе
-    len_list: list = [len(list(g)) for _, g in groupby(data_list)]
-    # объедениям список ключей и количество подсчитанных элементов групп в словарь
-    for k, v in zip(keys_list, len_list):
+    # список ключей из элементов и количество элементов в каждой группе
+    groups_list: list = [(str(k), len(tuple(v))) for k, v in groupby(data_list)]
+    for k, v in groups_list:
         dict_data[k].append(v)
     # подсчитываем значение в зависимости от запрошенной операции
     # если вид операции задан некорректно, возвращается None
