@@ -40,7 +40,7 @@ def find_nearest_number(
     # если входное значение невозможно представить как целое число, возвращаем None
     try:
         input_number: int = int(number)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
     result: Union[int, None] = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
@@ -121,7 +121,6 @@ def _do_find_nearest(
         безуспешного поиска
 
     """
-    sorted_list = list()  # используется для сортировки части массива цифр
     i: int = current_index  # текущая позиция исходного числа, относительно которой ведется поиск
     for k in range(i - 1, -1, -1):  # просматриваем все цифры левее текущей позиции
         # сравниваем с текущей позицией, учитывая направление поиска
@@ -132,12 +131,8 @@ def _do_find_nearest(
             # выполняем сортировку правой части числа
             if digits_list[0] > 0:
                 k += 1  # правая часть числа начинается со сдвигом от найденной позиции
-                # копируем правую часть числа в отдельный список для сортировки
-                sorted_list = digits_list[k::]
                 # сортируем правую часть числа (по возрвстанию или по убыванию) с учетом направления поиска
-                sorted_list.sort(reverse=(search_direction == 1))
-                # перезаписываем правую часть числа его отсортированной версией
-                digits_list[k::] = sorted_list
+                digits_list[k::] = sorted(digits_list[k::], reverse=(search_direction == 1))
                 # собираем из массива цифр результирующее число
                 return reduce(lambda dig_prev, dig_next: 10 * dig_prev + dig_next, digits_list)
     return None

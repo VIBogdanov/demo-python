@@ -28,3 +28,4 @@ def test_numbers_fail():
     assert find_nearest_number('153.12') is None
     assert find_nearest_number(153.72) == 135
     assert find_nearest_number(b'number') is None
+    assert find_nearest_number(None) is None

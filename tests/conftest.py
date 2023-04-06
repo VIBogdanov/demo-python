@@ -165,3 +165,61 @@ _data_results: dict = {
 )
 def fixture_data_results() -> dict:
     return _data_results
+
+
+# -------------------- test_sundry ------------------------------------
+_find_intervals_data: list[tuple] = [
+    ([1, -3, 4, 5], 9, [(2, 3)]),
+    ([1, -3, 4, 5], 0, []),
+    ([1, -3, 4, 5], None, []),
+    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 9, [(0, 4), (2, 4), (1, 5), (4, 8), (7, 8), (4, 10), (7, 10)]),
+    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 0, [(0, 1), (4, 6), (8, 9), (9, 10)]),
+    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], None, [(0, 1), (4, 6), (8, 9), (9, 10)]),
+]
+
+
+@pytest.fixture(
+    name="find_intervals_data",
+    params=_find_intervals_data,
+    ids=lambda item: str(f'{item[0]} - {item[1]}'),
+)
+def fixture_find_intervals_data(request) -> tuple:
+    return request.param
+
+
+_find_intervals_invalid_parameters: list[tuple] = [
+    ([], 0, []),
+    ([1, -3, 4, 5], 1.2, [(0, 0), (1, 2)]),
+    ([1, -3, 4, 5], '9', [(2, 3)]),
+    ([1, -3, 4, 5], '1.2', []),
+    ([1, -3, 4, 5], None, []),
+    ((1, -3, 4, 5), 9, [(2, 3)]),
+]
+
+
+@pytest.fixture(
+    name="find_intervals_invalid",
+    params=_find_intervals_invalid_parameters,
+    ids=lambda item: str(f'{item[0]} - {item[1]}'),
+)
+def fixture_find_intervals_invalid_parameters(request) -> tuple:
+    return request.param
+
+
+_find_intervals_fail: list[tuple] = [
+    ([1, -3, '4', 5], 9, []),
+    ('1, -3, 4, 5', 9, []),
+    (27, 9, []),
+    (12.5, 9, []),
+    (None, 9, []),
+    ({'x': 45, }, 9, []),
+]
+
+
+@pytest.fixture(
+    name="find_intervals_fail",
+    params=_find_intervals_fail,
+    ids=lambda item: str(f'{item[0]} - {item[1]}'),
+)
+def fixture_find_intervals_fail(request) -> tuple:
+    return request.param
