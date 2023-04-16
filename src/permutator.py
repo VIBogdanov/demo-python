@@ -4,10 +4,10 @@ from typing import Union
 
 
 def find_nearest_number(
-    number: Union[int, str],
+    number: int | str,
     previous: bool = True,
     multiproc: bool = False,
-) -> Union[int, None]:
+) -> int | None:
     """
     Функция поиска ближайшего целого числа, которое меньше или больше исходного
     и состоит из тех же цифр.

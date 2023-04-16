@@ -22,7 +22,7 @@ def test_numbers_str(numbers_int, arguments_list, capsys):
     test_numbers_int(numbers_int, arguments_list, capsys)
 
 
-def test_numbers_fail():
+def test_numbers_invalid_parameters():
     assert find_nearest_number('abc') is None
     assert find_nearest_number('812abc') is None
     assert find_nearest_number('153.12') is None

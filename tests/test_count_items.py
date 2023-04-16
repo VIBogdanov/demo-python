@@ -6,7 +6,7 @@ def test_data_list(data_list, data_item, operation, data_results):
     assert res == data_results.get(''.join([data_item, '-', operation]), -1)
 
 
-def test_data_fail(data_list):
+def test_data_invalid_parameters(data_list):
     assert count_items(data_list, '12') == 0
     assert count_items(data_list, 'zxc') == 0
     assert count_items(data_list, '0', 'abc') is None
