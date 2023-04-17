@@ -223,12 +223,12 @@ def find_item_by_binary(
         _is_forward = False  # Иначе по убыванию
     # Стартуем с первого и последнего индекса массива
     i_first = 0
-    i_last = len(elements)-1
+    i_last = len(elements) - 1
 
     i_target = None  # Возвращаемый индекс найденого значения
 
-    while (i_first <= i_last and i_target is None):
-        i_current = (i_first + i_last)//2  # Делим текущий остаток массива пополам
+    while i_first <= i_last and i_target is None:
+        i_current = (i_first + i_last) // 2  # Делим текущий остаток массива пополам
         try:
             match (elements[i_current], target):  # Сравниваем срединный элемент с искомым значением
                 # Если искомое значение найдено, прекращаем дальнейший поиск и возвращаем найденный индекс
@@ -269,17 +269,64 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
     while i_start < i_end:
         for i_current in range(i_start, i_end, 1):
             # Если текущий элемент больше следующего, то переставляем их местами. Это потенциальный максимум.
-            if (_sort_order * elements[i_current]) > (_sort_order * elements[i_current+1]):
-                elements[i_current], elements[i_current+1] = elements[i_current+1], elements[i_current]
+            if (_sort_order * elements[i_current]) > (_sort_order * elements[i_current + 1]):
+                elements[i_current], elements[i_current + 1] = elements[i_current + 1], elements[i_current]
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
                 if (_sort_order * elements[i_current]) < (_sort_order * elements[i_start]):
                     elements[i_start], elements[i_current] = elements[i_current], elements[i_start]
-            print(i_current+1, elements)
+            print(i_current + 1, elements)
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
         i_start += 1
         i_end -= 1
 
+    return elements
+
+
+# ------------------------------------------------------------------------------------------------
+def sort_by_merge(elements: list, revers: bool = False) -> list:
+    """
+    Функция сортировки методом слияния. Поддерживается сортировка как по возрастанию,
+    так и по убыванию.
+
+    Args:
+        elements (list): Список данных для сортировки
+        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+
+    Returns:
+        list: Результирующий отсортированный список.
+    """
+    if len(elements) > 1:
+        # Делим исходный список пополам.
+        _i_middle: int = len(elements) // 2
+        # Рекурсивно вызываем функцию до тех пор,
+        # пока исходный список не будет разложен поэлементно.
+        _left_list: list = sort_by_merge(elements[:_i_middle], revers)
+        _right_list: list = sort_by_merge(elements[_i_middle:], revers)
+        # Собираем список из стека рекурсивных вызовов
+        _i_left: int = 0
+        _i_right: int = 0
+        _i_result: int = 0
+        _sort_order: int = -1 if revers else 1  # Учитываем порядок сортировки
+        # Сравниваем поэлементно половинки списка и добавляем в результирующий список
+        # меньший или больший элемент, в зависимости от порядка сортировки.
+        while _i_left < len(_left_list) and _i_right < len(_right_list):
+            if (_sort_order * _left_list[_i_left]) < (_sort_order * _right_list[_i_right]):
+                elements[_i_result] = _left_list[_i_left]
+                _i_left += 1
+            else:
+                elements[_i_result] = _right_list[_i_right]
+                _i_right += 1
+            _i_result += 1
+            # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
+            match (_i_left < len(_left_list), _i_right < len(_right_list)):
+                case (True, False):
+                    elements[_i_result:] = _left_list[_i_left:]
+                    _i_result = len(elements)
+                case (False, True):
+                    elements[_i_result:] = _right_list[_i_right:]
+                    _i_result = len(elements)
+    # Следует учесть, что меняется исходный список данных и возвращается его отсортированная версия.
     return elements
 
 
