@@ -113,8 +113,8 @@ def find_nearest_number(
     # массив цифр из входного числа
     digits_list: list[int] = [int(digit) for digit in str(input_number)]
     # списки margs и mres используются в режиме многозадачности
-    margs_list = list()  # массив значений для параметров функции в режиме многозадачности
-    mres_list = list()  # список результатов, полученных от многозадачной функции
+    margs_list: list = list()  # массив значений для параметров функции в режиме многозадачности
+    mres_list: tuple = tuple()  # список результатов, полученных от многозадачной функции
     # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
     for i in range(len(digits_list) - 1, 0, -1):
         if multiproc:  # если включен режим многозадачности
@@ -140,9 +140,9 @@ def find_nearest_number(
     if multiproc:
         with Pool() as mpool:
             # из возвращаемых результирующих чисел исключаем значения равные None
-            mres_list = [
+            mres_list = tuple(
                 number_value for number_value in mpool.starmap(_do_find_nearest, margs_list) if number_value is not None
-            ]
+            )
         if mres_list:
             # если список результирующих чисел не пуст, находим наибольшее или наименьшее число
             # в зависимости от направления поиска
@@ -230,21 +230,57 @@ def find_item_by_binary(
     while (i_first <= i_last and i_target is None):
         i_current = (i_first + i_last)//2  # Делим текущий остаток массива пополам
         try:
-            match [elements[i_current], target]:  # Сравниваем срединный элемент с искомым значением
+            match (elements[i_current], target):  # Сравниваем срединный элемент с искомым значением
                 # Если искомое значение найдено, прекращаем дальнейший поиск и возвращаем найденный индекс
-                case [cur, trg] if cur == trg:
+                case (cur, trg) if cur == trg:
                     i_target = i_current
                 # В двух других случаях смещаем начальный или конечный индексы в зависимости от
                 # результата сравнения текущего элемента с искомым значением и от направления сортировки
-                case [cur, trg] if cur > trg:
+                case (cur, trg) if cur > trg:
                     i_first, i_last = (i_first, i_current - 1) if _is_forward else (i_current + 1, i_last)
-                case [cur, trg] if cur < trg:
+                case (cur, trg) if cur < trg:
                     i_first, i_last = (i_current + 1, i_last) if _is_forward else (i_first, i_current - 1)
         # Обрабатываем исключение в случае невозможности сравнить искомое значение с элементом массива
         except (ValueError, TypeError):
             return None
 
     return i_target
+
+
+# ----------------------------------------------------------------------------------------------------------
+def sort_by_bubble(elements: list, revers: bool = False) -> list:
+    """
+    Функция сортировки по методу пузырька. В отличии от классического метода, функция за каждую итерацию
+    одновременно ищет как максимальное значение, так и минимальное. На следующей итерации диапазон поиска
+    сокращается не на один элемент, а на два. Кроме того, реализована сортировка как по возрастанию, так
+    и по убыванию.
+
+    Args:
+        elements (list): Список данных для сортировки
+        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+
+    Returns:
+        list: Возвращает отсортированный список
+    """
+    i_start = 0
+    i_end = len(elements) - 1
+    _sort_order = -1 if revers else 1  # Задаем порядок сортировки
+
+    while i_start < i_end:
+        for i_current in range(i_start, i_end, 1):
+            # Если текущий элемент больше следующего, то переставляем их местами. Это потенциальный максимум.
+            if (_sort_order * elements[i_current]) > (_sort_order * elements[i_current+1]):
+                elements[i_current], elements[i_current+1] = elements[i_current+1], elements[i_current]
+                # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
+                if (_sort_order * elements[i_current]) < (_sort_order * elements[i_start]):
+                    elements[i_start], elements[i_current] = elements[i_current], elements[i_start]
+            print(i_current+1, elements)
+        # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
+        # т.к. на предыдущей итерации найдены одновременно минимум и максимум
+        i_start += 1
+        i_end -= 1
+
+    return elements
 
 
 if __name__ == "__main__":
