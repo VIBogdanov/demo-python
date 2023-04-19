@@ -1,5 +1,5 @@
 from collections import defaultdict
-from functools import reduce
+from functools import cache, reduce
 from itertools import accumulate
 from multiprocessing import Pool
 from typing import Any
@@ -274,7 +274,6 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
                 if (_sort_order * elements[i_current]) < (_sort_order * elements[i_start]):
                     elements[i_start], elements[i_current] = elements[i_current], elements[i_start]
-            print(i_current + 1, elements)
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
         i_start += 1
@@ -290,7 +289,7 @@ def sort_by_merge(elements: list, revers: bool = False) -> list:
     так и по убыванию.
 
     Args:
-        elements (list): Список данных для сортировки
+        elements (list): Список данных для сортировки.
         revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
 
     Returns:
@@ -327,6 +326,136 @@ def sort_by_merge(elements: list, revers: bool = False) -> list:
                     elements[_i_result:] = _right_list[_i_right:]
                     _i_result = len(elements)
     # Следует учесть, что меняется исходный список данных и возвращается его отсортированная версия.
+    return elements
+
+
+# --------------------------------------------------------------------------------------------
+class GetRangeSort:
+    """
+    Вспомогательный класс для функции sort_by_shell(). Реализует различные методы формарования
+    диапазона чисел для перестановки. Реализованы следующие методы:
+    - Классический метод Shell
+    - Hibbard
+    - Sedgewick
+    - Knuth
+    - Fibonacci
+    """
+    def __init__(self, list_len: int, method: str = 'Shell') -> None:
+        self.__len: int = list_len
+        self.__method: str = method.lower()
+        self.__range: int = None
+        self.__i: int = 0
+        match self.__method:
+            case 'hibbard':
+                while self.__get_hibbard_range(self.__i) <= self.__len:
+                    self.__i += 1
+                else:
+                    self.__i -= 1
+            case 'sedgewick':
+                while self.__get_sedgewick_range(self.__i) < self.__len:
+                    self.__i += 1
+                else:
+                    self.__i -= 1
+            case 'knuth':
+                while self.__get_knuth_range(self.__i) < (self.__len // 3):
+                    self.__i += 1
+            case 'fibonacci':
+                while self.__get_fibonacci_range(self.__i) <= self.__len:
+                    self.__i += 1
+                else:
+                    self.__i -= 1
+            case 'shell' | _:
+                self.__range = None
+    
+    @cache
+    def __get_hibbard_range(self, i: int) -> int:
+        return (2**i - 1)
+
+    @cache
+    def __get_sedgewick_range(self, i: int) -> int:
+        if i % 2 == 0:
+            return 9 * (2**i - 2**(i//2)) + 1
+        else:
+            return 8 * 2**i - 6 * 2**((i+1)//2) + 1
+        
+    @cache
+    def __get_knuth_range(self, i: int) -> int:
+        return (3**i - 1) // 2
+    
+    @cache
+    def __get_fibonacci_range(self, i: int) -> int:
+        return (self.__get_fibonacci_range(i-2) + self.__get_fibonacci_range(i-1)) if i > 1 else 1
+
+    @property
+    def nextrange(self) -> int:
+        match self.__method:
+            case 'hibbard':
+                if self.__i > 0:
+                    self.__range = self.__get_hibbard_range(self.__i)
+                    self.__i -= 1
+                else:
+                    self.__range = 0
+            case 'sedgewick':
+                if self.__i >= 0:
+                    self.__range = self.__get_sedgewick_range(self.__i)
+                    self.__i -= 1
+                else:
+                    self.__range = 0
+            case 'knuth':
+                if self.__i > 0:
+                    self.__range = self.__get_knuth_range(self.__i)
+                    self.__i -= 1
+                else:
+                    self.__range = 0
+            case 'fibonacci':
+                if self.__i > 0:
+                    self.__range = self.__get_fibonacci_range(self.__i)
+                    self.__i -= 1
+                else:
+                    self.__range = 0
+            case 'shell' | _:
+                self.__range = (self.__len // 2) if self.__range is None else (self.__range // 2)
+        return self.__range
+    
+    @property
+    def getrange(self) -> int:
+        return 0 if self.__range is None else self.__range
+
+
+def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -> list:
+    """
+    Функция сортировки методом Shell. Кроме классического метода формирования
+    дипазанона чисел для перестановки, возможно использовать следующие методы:
+    - Hibbard
+    - Sedgewick
+    - Knuth
+    - Fibonacci
+
+    Реализована двунаправленная сортировка.
+
+    Args:
+        elements (list): Список данных для сортировки
+
+        revers (bool, optional): Если задано True, то сортировка по убыванию.. Defaults to False.
+
+        method (str, optional): Мотод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth, Fibonacci. Defaults to "Shell".
+
+    Returns:
+        list: Отсортированный список.
+    """
+    _sort_order: int = -1 if revers else 1
+    _range = GetRangeSort(len(elements), method)
+    while _range.nextrange > 0:
+        for _i_range in range(_range.getrange, len(elements)):
+            _i_current: int = _i_range
+            while (_i_current >= _range.getrange) and (
+                (_sort_order * elements[_i_current]) < (_sort_order * elements[_i_current - _range.getrange])
+            ):
+                elements[_i_current], elements[_i_current - _range.getrange] = (
+                    elements[_i_current - _range.getrange],
+                    elements[_i_current],
+                )
+                _i_current -= _range.getrange
     return elements
 
 
