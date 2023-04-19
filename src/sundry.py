@@ -272,7 +272,7 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
             if (_sort_order * elements[i_current]) > (_sort_order * elements[i_current + 1]):
                 elements[i_current], elements[i_current + 1] = elements[i_current + 1], elements[i_current]
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
-                if (_sort_order * elements[i_current]) < (_sort_order * elements[i_start]):
+                if i_current > i_start and (_sort_order * elements[i_current]) < (_sort_order * elements[i_start]):
                     elements[i_start], elements[i_current] = elements[i_current], elements[i_start]
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
@@ -286,7 +286,7 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
 def sort_by_merge(elements: list, revers: bool = False) -> list:
     """
     Функция сортировки методом слияния. Поддерживается сортировка как по возрастанию,
-    так и по убыванию.
+    так и по убыванию. Имеет смысл использовать на больших диапазонах данных.
 
     Args:
         elements (list): Список данных для сортировки.
@@ -343,7 +343,7 @@ class GetRangeSort:
     def __init__(self, list_len: int, method: str = 'Shell') -> None:
         self.__len: int = list_len
         self.__method: str = method.lower()
-        self.__range: int = None
+        self.__range: int | None = None
         self.__i: int = 0
         match self.__method:
             case 'hibbard':
@@ -366,7 +366,7 @@ class GetRangeSort:
                     self.__i -= 1
             case 'shell' | _:
                 self.__range = None
-    
+
     @cache
     def __get_hibbard_range(self, i: int) -> int:
         return (2**i - 1)
@@ -377,11 +377,11 @@ class GetRangeSort:
             return 9 * (2**i - 2**(i//2)) + 1
         else:
             return 8 * 2**i - 6 * 2**((i+1)//2) + 1
-        
+
     @cache
     def __get_knuth_range(self, i: int) -> int:
         return (3**i - 1) // 2
-    
+
     @cache
     def __get_fibonacci_range(self, i: int) -> int:
         return (self.__get_fibonacci_range(i-2) + self.__get_fibonacci_range(i-1)) if i > 1 else 1
@@ -416,7 +416,7 @@ class GetRangeSort:
             case 'shell' | _:
                 self.__range = (self.__len // 2) if self.__range is None else (self.__range // 2)
         return self.__range
-    
+
     @property
     def getrange(self) -> int:
         return 0 if self.__range is None else self.__range
@@ -438,7 +438,8 @@ def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -
 
         revers (bool, optional): Если задано True, то сортировка по убыванию.. Defaults to False.
 
-        method (str, optional): Мотод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth, Fibonacci. Defaults to "Shell".
+        method (str, optional): Мотод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth,
+        Fibonacci. Defaults to "Shell".
 
     Returns:
         list: Отсортированный список.
@@ -456,6 +457,62 @@ def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -
                     elements[_i_current],
                 )
                 _i_current -= _range.getrange
+    return elements
+
+
+# -------------------------------------------------------------------------------------------------
+def sort_by_selection(elements: list, revers: bool = False) -> list:
+    """
+    Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки,
+    за счет сокращения числа перестановок элементов. Элементы переставляются не на
+    каждом шаге итерации, а только лишь в конце текущей итерации. Дополнительно к
+    классическому алгоритму добавлена возможность одновременного поиска максимального
+    и минимального элементов текущего диапазона за одну итерацию. Реализована
+    двунаправленная сортировка списка данных.
+
+    Args:
+        elements (list): Список данных для сортировки.
+        revers (bool, optional): Если задано True, список сортируется по убыванию. Defaults to False.
+
+    Returns:
+        list: Возвращаемый отсортированный список.
+    """
+    # Стартуем с дипазална равного длине списка данных, кроме последнего элемента.
+    i_start = 0
+    i_end = len(elements) - 1
+    # Потенциальные минимум и максимум в начале и конце диапазона
+    i_min = i_start
+    i_max = i_end
+    _sort_order = -1 if revers else 1  # Задаем порядок сортировки
+    # Перебираем диапазоны, сокращая длину каждого следующего диапазона на 2
+    while i_start < i_end:
+        # Т.к. до последнего элемента не доходим, необходимо перед итерацией
+        # сравнить последний элемент с первым. Возмоно последний элемент
+        # потенуиальный минимум текущего диапазона
+        if (_sort_order * elements[i_end]) < (_sort_order * elements[i_start]):
+            # Меняем местами первый и последний элементы текущего диапазона
+            elements[i_start], elements[i_end] = elements[i_end], elements[i_start]
+        for i_current in range(i_start, i_end, 1):
+            # Если текущий элемент больше последнего в диапазоне, то это потенциальный максимум
+            # для текущего дипазона.
+            if (_sort_order * elements[i_current]) > (_sort_order * elements[i_max]):
+                i_max = i_current
+            # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
+            elif (i_current > i_start) and (_sort_order * elements[i_current]) < (_sort_order * elements[i_min]):
+                i_min = i_current
+        # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
+        # с начальным и/или конечным элементом текущего диапазона.
+        if i_max != i_end:
+            elements[i_end], elements[i_max] = elements[i_max], elements[i_end]
+        if i_min != i_start:
+            elements[i_start], elements[i_min] = elements[i_min], elements[i_start]
+        # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
+        # т.к. на предыдущей итерации найдены одновременно минимум и максимум
+        i_start += 1
+        i_end -= 1
+        i_min = i_start
+        i_max = i_end
+    # Следует учесть, что изменяется исходный список данных
     return elements
 
 
