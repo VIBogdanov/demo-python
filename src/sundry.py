@@ -1,8 +1,107 @@
 from collections import defaultdict
 from functools import cache, reduce
-from itertools import accumulate
+from itertools import accumulate, islice
 from multiprocessing import Pool
 from typing import Any
+
+
+# ---------------------Вспомогательные функции----------------------------------
+def is_sorted(elements, revers: bool = False) -> bool:
+    """
+    Проверяет отсортирован ли список. В случае больших списков используются
+    параллельные вычисления. При проверке учитывается порядок сортировки.
+
+    Args:
+        elements (_type_): Список для проверки.
+        revers (bool, optional): Порядок сортировки. Defaults to False.
+
+    Returns:
+        bool: True, если список отсортирован.
+    """
+    margs_list: list = list()  # массив значений для параметров функции в режиме многозадачности
+    _range_size = 100_000  # размер минимального диапазона подсписков, на которе делиться исходный список
+    _ln = len(elements)
+    # Пустые списки или списки из одного элемента всегда отсортированы
+    if _ln < 2:
+        return True
+    # Если исходный список можно разделить хотя бы на 2 подсписка
+    if _ln >= (_range_size * 2):
+        # Вычисляем диапазоны разбиения исходного списка
+        _ranges_list: list = _get_ranges(_ln, _range_size)
+        # Для каждого диапазона проверяем пограничный элемент на признак сортировки.
+        # Возможна ситуация, когда два отдельный подсписка отсортированы, но целый список нет
+        # Например: [1,2,4,3,5,6]. Если разделить на два, то оба подсписка будут отсортированы,
+        # но при этом исходный список не отсортирован.
+        for i_start, i_end in _ranges_list:
+            if (i_end < _ln) and (elements[i_end - 1] > elements[i_end] or elements[i_end] > elements[i_end + 1]):
+                return False
+            # Формируем список параметров для вызова функции проверки сортировки
+            # в многозадачном режиме для различных диапазонов
+            margs_list.append(tuple([elements[i_start:i_end], revers]))
+        # Запускам пул параллельных процессов для проверки сортировки набора диапазонов
+        with Pool() as mpool:
+            # Возвращаем True, только если все без исключения проверки успешны
+            return all(mpool.starmap(_is_srt, margs_list))
+    else:
+        # Для небольших списков нет смысла использовать многозадачность
+        return _is_srt(elements, revers)
+
+
+def _get_ranges(list_len: int, range_len: int) -> list[tuple]:
+    """
+    Вспомогательная функция, формируюшая список диапазонов подсписков,
+    на которые можно разбить исходноый список.
+
+    Args:
+        list_len (int): Длина исходного списка.
+        range_len (int): Размер подсписка.
+
+    Returns:
+        list[tuple]: Список диапазонов.
+    """
+    result_list: list = list()
+    i: int = 0
+    # Исключаем ошибки и слишком короткие величины длин.
+    if (range_len >= list_len) or (list_len < 4) or (range_len < 2):
+        result_list.append((0, list_len))
+    else:
+        while (range_len * (i + 1)) <= list_len:
+            result_list.append(((i * range_len), (range_len * (i + 1))))
+            i += 1
+        # Добавляем "хвост" в случае невозможности разбить на равные части
+        if (list_len % range_len) > 0:
+            result_list.append(((i * range_len), (i * range_len + list_len % range_len)))
+
+    return result_list
+
+
+def _is_srt(elements, revers: bool = False) -> bool:
+    """
+    Вспомогательная функция, поэлементно проверяющая отсортирован ли исходный список
+    в зависимости от заданного направления сортировки. При первом ложном сравнении
+    итерация прерывается.
+
+    Args:
+        elements (_type_): Исходный список для проверки.
+        revers (bool, optional): Направление сортировки.. Defaults to False.
+
+    Returns:
+        bool: True - список отсортирован.
+    """
+    _ln = len(elements)
+    if _ln < 2:
+        return True
+    _sort_order: int = -1 if revers else 1
+    # Альтернативный вариант чуть быстрее, но требует библиотечной функции islice
+    # from itertools import islice
+    for _current, _next in zip(elements, islice(elements, 1, None)):
+        if (_sort_order * _current) > (_sort_order * _next):
+            return False
+    return True
+    # for i in range(1, _ln):
+    #    if (_sort_order * elements[i - 1]) > (_sort_order * elements[i]):
+    #        return False
+    # return True
 
 
 # ------------------------------------------------------------------------------
@@ -340,43 +439,44 @@ class GetRangeSort:
     - Knuth
     - Fibonacci
     """
-    def __init__(self, list_len: int, method: str = 'Shell') -> None:
+
+    def __init__(self, list_len: int, method: str = "Shell") -> None:
         self.__len: int = list_len
         self.__method: str = method.lower()
         self.__range: int | None = None
         self.__i: int = 0
         match self.__method:
-            case 'hibbard':
+            case "hibbard":
                 while self.__get_hibbard_range(self.__i) <= self.__len:
                     self.__i += 1
                 else:
                     self.__i -= 1
-            case 'sedgewick':
+            case "sedgewick":
                 while self.__get_sedgewick_range(self.__i) < self.__len:
                     self.__i += 1
                 else:
                     self.__i -= 1
-            case 'knuth':
+            case "knuth":
                 while self.__get_knuth_range(self.__i) < (self.__len // 3):
                     self.__i += 1
-            case 'fibonacci':
+            case "fibonacci":
                 while self.__get_fibonacci_range(self.__i) <= self.__len:
                     self.__i += 1
                 else:
                     self.__i -= 1
-            case 'shell' | _:
+            case "shell" | _:
                 self.__range = None
 
     @cache
     def __get_hibbard_range(self, i: int) -> int:
-        return (2**i - 1)
+        return 2**i - 1
 
     @cache
     def __get_sedgewick_range(self, i: int) -> int:
         if i % 2 == 0:
-            return 9 * (2**i - 2**(i//2)) + 1
+            return 9 * (2**i - 2 ** (i // 2)) + 1
         else:
-            return 8 * 2**i - 6 * 2**((i+1)//2) + 1
+            return 8 * 2**i - 6 * 2 ** ((i + 1) // 2) + 1
 
     @cache
     def __get_knuth_range(self, i: int) -> int:
@@ -384,36 +484,36 @@ class GetRangeSort:
 
     @cache
     def __get_fibonacci_range(self, i: int) -> int:
-        return (self.__get_fibonacci_range(i-2) + self.__get_fibonacci_range(i-1)) if i > 1 else 1
+        return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
 
     @property
     def nextrange(self) -> int:
         match self.__method:
-            case 'hibbard':
+            case "hibbard":
                 if self.__i > 0:
                     self.__range = self.__get_hibbard_range(self.__i)
                     self.__i -= 1
                 else:
                     self.__range = 0
-            case 'sedgewick':
+            case "sedgewick":
                 if self.__i >= 0:
                     self.__range = self.__get_sedgewick_range(self.__i)
                     self.__i -= 1
                 else:
                     self.__range = 0
-            case 'knuth':
+            case "knuth":
                 if self.__i > 0:
                     self.__range = self.__get_knuth_range(self.__i)
                     self.__i -= 1
                 else:
                     self.__range = 0
-            case 'fibonacci':
+            case "fibonacci":
                 if self.__i > 0:
                     self.__range = self.__get_fibonacci_range(self.__i)
                     self.__i -= 1
                 else:
                     self.__range = 0
-            case 'shell' | _:
+            case "shell" | _:
                 self.__range = (self.__len // 2) if self.__range is None else (self.__range // 2)
         return self.__range
 
@@ -478,12 +578,12 @@ def sort_by_selection(elements: list, revers: bool = False) -> list:
         list: Возвращаемый отсортированный список.
     """
     # Стартуем с дипазална равного длине списка данных, кроме последнего элемента.
-    i_start = 0
-    i_end = len(elements) - 1
+    i_start: int = 0
+    i_end: int = len(elements) - 1
     # Потенциальные минимум и максимум в начале и конце диапазона
-    i_min = i_start
-    i_max = i_end
-    _sort_order = -1 if revers else 1  # Задаем порядок сортировки
+    i_min: int = i_start
+    i_max: int = i_end
+    _sort_order: int = -1 if revers else 1  # Задаем порядок сортировки
     # Перебираем диапазоны, сокращая длину каждого следующего диапазона на 2
     while i_start < i_end:
         # Т.к. до последнего элемента не доходим, необходимо перед итерацией
