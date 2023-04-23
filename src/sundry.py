@@ -384,8 +384,8 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
 # ------------------------------------------------------------------------------------------------
 def sort_by_merge(elements: list, revers: bool = False) -> list:
     """
-    Функция сортировки методом слияния. Поддерживается сортировка как по возрастанию,
-    так и по убыванию. Имеет смысл использовать на больших диапазонах данных.
+    Функция сортировки методом слияния. Поддерживается сортировка как
+    по возрастанию, так и по убыванию. Имеет смысл использовать на больших диапазонах данных.
 
     Args:
         elements (list): Список данных для сортировки.
@@ -416,14 +416,14 @@ def sort_by_merge(elements: list, revers: bool = False) -> list:
                 elements[_i_result] = _right_list[_i_right]
                 _i_right += 1
             _i_result += 1
-            # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
-            match (_i_left < len(_left_list), _i_right < len(_right_list)):
-                case (True, False):
-                    elements[_i_result:] = _left_list[_i_left:]
-                    _i_result = len(elements)
-                case (False, True):
-                    elements[_i_result:] = _right_list[_i_right:]
-                    _i_result = len(elements)
+        # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
+        match (_i_left < len(_left_list), _i_right < len(_right_list)):
+            case (True, False):
+                elements[_i_result:] = _left_list[_i_left:]
+                _i_result = len(elements)
+            case (False, True):
+                elements[_i_result:] = _right_list[_i_right:]
+                _i_result = len(elements)
     # Следует учесть, что меняется исходный список данных и возвращается его отсортированная версия.
     return elements
 
