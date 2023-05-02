@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import cache, reduce
 from itertools import accumulate
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from typing import Any
 
 
@@ -36,29 +36,29 @@ def find_intervals(
         >>> find_intervals([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 0)
         [(0, 1), (4, 6), (8, 9), (9, 10)]
     """
-    sum_dict: defaultdict = defaultdict(list[int])
-    result_list: list[tuple] = list()
-
     try:
         target = int(target)
     except (ValueError, TypeError):
         return []
+    else:
+        sum_dict: defaultdict = defaultdict(list[int])
+        result_list: list[tuple] = list()
 
-    # Суммируем элементы списка по нарастающей и сохраняем в словаре
-    # список индексов для каждой суммы. В качестве ключа - сама сумма.
-    for id_to, sum_accum in enumerate(accumulate(elements)):
-        # Если на очередной итерации полученная сумма равна искомому значению,
-        # заносим диапазон от 0 до текущей позиции в результирующий список.
-        if sum_accum == target:
-            result_list.append((0, id_to))
-        # Ищем пару из уже вычисленных ранее сумм для значения (Sum - Target).
-        # Если пара найдена, извлекаем индексы и формируем результирующие диапазоны.
-        for id_from in sum_dict.get((sum_accum - target), []):
-            result_list.append((id_from + 1, id_to))
-        # Сохраняем очередную сумму и ее индекс в словаре, где ключ - сама сумма.
-        sum_dict[sum_accum].append(id_to)
+        # Суммируем элементы списка по нарастающей и сохраняем в словаре
+        # список индексов для каждой суммы. В качестве ключа - сама сумма.
+        for id_to, sum_accum in enumerate(accumulate(elements)):
+            # Если на очередной итерации полученная сумма равна искомому значению,
+            # заносим диапазон от 0 до текущей позиции в результирующий список.
+            if sum_accum == target:
+                result_list.append((0, id_to))
+            # Ищем пару из уже вычисленных ранее сумм для значения (Sum - Target).
+            # Если пара найдена, извлекаем индексы и формируем результирующие диапазоны.
+            for id_from in sum_dict.get((sum_accum - target), []):
+                result_list.append((id_from + 1, id_to))
+            # Сохраняем очередную сумму и ее индекс в словаре, где ключ - сама сумма.
+            sum_dict[sum_accum].append(id_to)
 
-    return result_list
+        return result_list
 
 
 # -------------------------------------------------------------------------------
@@ -101,57 +101,59 @@ def find_nearest_number(
         input_number: int = int(number)
     except (ValueError, TypeError):
         return None
+    else:
+        result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
+        search_direction: int = 1 if previous else -1  # направление поиска: большее или меньшее
+        sign_number: int = 1
 
-    result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
-    search_direction: int = 1 if previous else -1  # направление поиска: большее или меньшее
-    sign_number: int = 1
+        if input_number < 0:  # если входное число отрицательное
+            sign_number = -1  # сохраняем знак числа
+            input_number *= -1  # переводим входное число на положительное значение
+            search_direction *= -1  # меняем направление поиска
+        # массив цифр из входного числа
+        digits_list: list[int] = [int(digit) for digit in str(input_number)]
+        # списки margs и mres используются в режиме многозадачности
+        margs_list: list = list()  # массив значений для параметров функции в режиме многозадачности
+        mres_list: tuple = tuple()  # список результатов, полученных от многозадачной функции
+        # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
+        for i in range(len(digits_list) - 1, 0, -1):
+            if multiproc:  # если включен режим многозадачности
+                # сохраняем наборы входных значений в массиве
+                # передаем копию массива цифр входного числа вместо ссылки,
+                # чтобы не влиять на исходный массив при перестановке цифр внутри подпрограммы
+                margs_list.append(tuple([digits_list.copy(), i, search_direction]))
+            else:
+                # в синхронном режиме последовательно вызываем подпрограмму поиска большего
+                # или меньшего числа в зависимости от направления поиска
+                found_number = _do_find_nearest(digits_list.copy(), i, search_direction)
+                if found_number is not None:
+                    # если это первое найденное число (возможно единственное), сохраняем его как
+                    # результирующее и переходим к следующей цифре
+                    if result is None:
+                        result = found_number
+                    else:
+                        # сравниваем очередное найденное число с ранее сохраненным и выбираем большее
+                        # или меньшее из них в зависимости от направления поиска
+                        result = max(result, found_number) if search_direction == 1 else min(result, found_number)
+        # при включенном режиме многозадачности формируем пул процессов и передаем в него
+        # подпрограмму с набором различных параметров для параллельного запуска
+        if multiproc:
+            with Pool(processes=min(cpu_count(), len(margs_list))) as mpool:
+                # из возвращаемых результирующих чисел исключаем значения равные None
+                mres_list = tuple(
+                    number_value
+                    for number_value in mpool.starmap(_do_find_nearest, margs_list)
+                    if number_value is not None
+                )
+            if mres_list:
+                # если список результирующих чисел не пуст, находим наибольшее или наименьшее число
+                # в зависимости от направления поиска
+                result = max(mres_list) if search_direction == 1 else min(mres_list)
+        # если искомое число найдено и входное число было отрицательным, восстанавливаем знак минус
+        if result is not None and sign_number == -1:
+            result *= -1
 
-    if input_number < 0:  # если входное число отрицательное
-        sign_number = -1  # сохраняем знак числа
-        input_number *= -1  # переводим входное число на положительное значение
-        search_direction *= -1  # меняем направление поиска
-    # массив цифр из входного числа
-    digits_list: list[int] = [int(digit) for digit in str(input_number)]
-    # списки margs и mres используются в режиме многозадачности
-    margs_list: list = list()  # массив значений для параметров функции в режиме многозадачности
-    mres_list: tuple = tuple()  # список результатов, полученных от многозадачной функции
-    # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
-    for i in range(len(digits_list) - 1, 0, -1):
-        if multiproc:  # если включен режим многозадачности
-            # сохраняем наборы входных значений в массиве
-            # передаем копию массива цифр входного числа вместо ссылки,
-            # чтобы не влиять на исходный массив при перестановке цифр внутри подпрограммы
-            margs_list.append(tuple([digits_list.copy(), i, search_direction]))
-        else:
-            # в синхронном режиме последовательно вызываем подпрограмму поиска большего
-            # или меньшего числа в зависимости от направления поиска
-            found_number = _do_find_nearest(digits_list.copy(), i, search_direction)
-            if found_number is not None:
-                # если это первое найденное число (возможно единственное), сохраняем его как
-                # результирующее и переходим к следующей цифре
-                if result is None:
-                    result = found_number
-                else:
-                    # сравниваем очередное найденное число с ранее сохраненным и выбираем большее
-                    # или меньшее из них в зависимости от направления поиска
-                    result = max(result, found_number) if search_direction == 1 else min(result, found_number)
-    # при включенном режиме многозадачности формируем пул процессов и передаем в него
-    # подпрограмму с набором различных параметров для параллельного запуска
-    if multiproc:
-        with Pool() as mpool:
-            # из возвращаемых результирующих чисел исключаем значения равные None
-            mres_list = tuple(
-                number_value for number_value in mpool.starmap(_do_find_nearest, margs_list) if number_value is not None
-            )
-        if mres_list:
-            # если список результирующих чисел не пуст, находим наибольшее или наименьшее число
-            # в зависимости от направления поиска
-            result = max(mres_list) if search_direction == 1 else min(mres_list)
-    # если искомое число найдено и входное число было отрицательным, восстанавливаем знак минус
-    if result is not None and sign_number == -1:
-        result *= -1
-
-    return result
+        return result
 
 
 def _do_find_nearest(
@@ -328,10 +330,11 @@ def sort_by_merge(elements: list, revers: bool = False) -> list:
 
 
 # --------------------------------------------------------------------------------------------
-class GetRangeSort:
+class GetRangesSort:
     """
-    Вспомогательный класс для функции sort_by_shell(). Реализует различные методы формарования
-    диапазона чисел для перестановки. Реализованы следующие методы:
+    Вспомогательный класс для функции sort_by_shell(). Реализует различные методы формирования
+    диапазонов чисел для перестановки. Класс является как итератором, так и классом со свойствами.
+    Реализованы следующие методы:
     - Классический метод Shell
     - Hibbard
     - Sedgewick
@@ -366,6 +369,15 @@ class GetRangeSort:
             case "shell" | _:
                 self.__range = None
 
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.getnextrange > 0:
+            return self.__range
+        else:
+            raise StopIteration
+
     @cache
     def __get_hibbard_range(self, i: int) -> int:
         return 2**i - 1
@@ -386,7 +398,7 @@ class GetRangeSort:
         return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
 
     @property
-    def nextrange(self) -> int:
+    def getnextrange(self) -> int:
         match self.__method:
             case "hibbard":
                 if self.__i > 0:
@@ -417,7 +429,7 @@ class GetRangeSort:
         return self.__range
 
     @property
-    def getrange(self) -> int:
+    def getcurrentrange(self) -> int:
         return 0 if self.__range is None else self.__range
 
 
@@ -444,18 +456,18 @@ def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -
         list: Отсортированный список.
     """
     _sort_order: int = -1 if revers else 1
-    _range = GetRangeSort(len(elements), method)
-    while _range.nextrange > 0:
-        for _i_range in range(_range.getrange, len(elements)):
+    _ranges = GetRangesSort(len(elements), method)
+    for _range in _ranges:
+        for _i_range in range(_range, len(elements)):
             _i_current: int = _i_range
-            while (_i_current >= _range.getrange) and (
-                (_sort_order * elements[_i_current]) < (_sort_order * elements[_i_current - _range.getrange])
+            while (_i_current >= _range) and (
+                (_sort_order * elements[_i_current]) < (_sort_order * elements[_i_current - _range])
             ):
-                elements[_i_current], elements[_i_current - _range.getrange] = (
-                    elements[_i_current - _range.getrange],
+                elements[_i_current], elements[_i_current - _range] = (
+                    elements[_i_current - _range],
                     elements[_i_current],
                 )
-                _i_current -= _range.getrange
+                _i_current -= _range
     return elements
 
 

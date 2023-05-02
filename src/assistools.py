@@ -1,6 +1,7 @@
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import cpu_count
-from time import time
+
+CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 
 
 def get_positive_int(value) -> int:
@@ -21,11 +22,11 @@ def get_positive_int(value) -> int:
         result = int(value)
     except (ValueError, TypeError):
         result = 0
-
-    if result < 0:
-        result *= -1
-
-    return result
+    else:
+        if result < 0:
+            result *= -1
+    finally:
+        return result
 
 
 def get_ranges(list_len: int, range_len: int):
@@ -64,7 +65,10 @@ def _is_srt(range1, range2, revers: bool = False) -> bool:
     итерация прерывается.
 
     Args:
-        elements (_type_): Исходный список для проверки.
+        range1 (_type_): Исходный список для проверки без последнего элемента.
+
+        range1 (_type_): Исходный список для проверки без первого элемента.
+
         revers (bool, optional): Направление сортировки. Defaults to False.
 
     Returns:
@@ -94,22 +98,19 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
     Returns:
         bool: True, если список отсортирован.
     """
-    _margs_list: list[tuple] = list()  # массив значений для параметров функции в режиме много задачности
-    _cpu: int = cpu_count()
-    # Для хранения резудьтатов выполнения задач используем set, ибо он быстрее
-    _futures: set[Future] = set()
-    _result: bool = True
-
     # Пустые списки или списки из одного элемента всегда отсортированы
     if (_ln := len(elements)) < 2:
         return True
+
+    _margs_list: list[tuple] = list()  # массив значений для параметров функции в режиме много задачности
+    _cpu: int = cpu_count()
+    _result: bool = True  # По умолчанию считаем список отсортированным
 
     # размер минимального диапазона, на которые делится исходный список
     _range_size: int = get_positive_int(rangesize)
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
     if _range_size == 0:
-        # Считаем, что частота процессора 4000
-        _range_size = _cpu * 4000
+        _range_size = _cpu * CPU_FREQUENCY
 
     # Если исходный список можно разделить хотя бы на 2 подсписка
     # запускаем многозадачную обработку
@@ -128,25 +129,27 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
             # ощутимого расхода памяти при больших исходных данных
             _margs_list.append(
                 tuple(
-                    [
+                    (
                         iter(elements[i_start:(i_end - 1)]),
                         iter(elements[(i_start + 1):i_end]),
                         revers,
-                    ]
+                    )
                 )
             )
         # Запускаем пул параллельных процессов для проверки сортировки набора диапазонов
-        # Главное его преимущества:
+        # Главные его преимущества:
         # - результаты получаем сразу по готовности не дожидаясь завершения всех задач
-        # - досрочное завершение обработки
-        with ProcessPoolExecutor(max_workers=_cpu) as _executor:
-            _futures = {_executor.submit(_is_srt, *_marg) for _marg in _margs_list}
+        # - досрочное завершение обработки результатов
+        with ProcessPoolExecutor(max_workers=min(_cpu, len(_margs_list))) as _executor:
+            # Используем генератор, который работает быстрее и память экономит
+            _futures = (_executor.submit(_is_srt, *_marg) for _marg in _margs_list)
             # Запускаем цикл получения результатов по мере их поступления
             for _future in as_completed(_futures):
+                # Если хотя бы одна из частей списка не отсортирована
                 if (_result := _future.result()) is False:
-                    # Останавливаем загрузку задач в пул процессов
+                    # Останавливаем дальнейшую загрузку задач в пул процессов
                     _executor.shutdown(wait=False, cancel_futures=True)
-                    break  # Прерывает цикл for
+                    break  # Прерывает цикл (for) проверки результатов
         return _result
     else:
         # Для небольших списков нет смысла использовать многозадачность
@@ -154,10 +157,4 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
 
 
 if __name__ == "__main__":
-    data = list(range(10_000_000))
-    # data = [101, 103, 102] + data
-    # data = data + [101, 103, 102]
-    start = time()
-    # res = is_sorted(data)
-    # print(f"{res}: ", time() - start)
     pass
