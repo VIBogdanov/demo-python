@@ -1,5 +1,5 @@
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from multiprocessing import cpu_count
+from multiprocessing import Pool, cpu_count
+from typing import Generator, Iterable
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 
@@ -29,7 +29,7 @@ def get_positive_int(value) -> int:
         return result
 
 
-def get_ranges(list_len: int, range_len: int):
+def get_ranges(list_len: int, range_len: int) -> Generator[tuple[int, int], None, None]:
     """
     Функция-генератор, формирующая список диапазонов,
     на которые можно разбить исходноый список.
@@ -41,7 +41,6 @@ def get_ranges(list_len: int, range_len: int):
     Yields:
         _type_: Возвращает кортеж с начальной и конечной позицией.
     """
-    i: int = 0
     # Корректируем возможные ошибки во входных параметрах
     _list_len: int = get_positive_int(list_len)
     _range_len: int = get_positive_int(range_len)
@@ -58,7 +57,13 @@ def get_ranges(list_len: int, range_len: int):
             yield (i, i + _range_len) if (i + _range_len) < _list_len else (i, _list_len)
 
 
-def _is_srt(range1, range2, revers: bool = False) -> bool:
+# Обертка для _is_srt, чтобы можно было передавать кортеж
+# в качестве единственного параметра в функции imap_unordered (см. is_sorted)
+def _is_srt_imap_unordered(_args: tuple) -> bool:
+    return _is_srt(*_args)
+
+
+def _is_srt(range1: Iterable, range2: Iterable, revers: bool = False) -> bool:
     """
     Вспомогательная функция, поэлементно проверяющая отсортирован ли исходный список
     в зависимости от заданного направления сортировки. При первом ложном сравнении
@@ -136,20 +141,21 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
                     )
                 )
             )
+
         # Запускаем пул параллельных процессов для проверки сортировки набора диапазонов
-        # Главные его преимущества:
-        # - результаты получаем сразу по готовности не дожидаясь завершения всех задач
+        # - результаты получаем сразу по готовности не дожидаясь завершения всех проверок
         # - досрочное завершение обработки результатов
-        with ProcessPoolExecutor(max_workers=min(_cpu, len(_margs_list))) as _executor:
-            # Используем генератор, который работает быстрее и память экономит
-            _futures = (_executor.submit(_is_srt, *_marg) for _marg in _margs_list)
-            # Запускаем цикл получения результатов по мере их поступления
-            for _future in as_completed(_futures):
-                # Если хотя бы одна из частей списка не отсортирована
-                if (_result := _future.result()) is False:
-                    # Останавливаем дальнейшую загрузку задач в пул процессов
-                    _executor.shutdown(wait=False, cancel_futures=True)
+        with Pool(processes=min(_cpu, len(_margs_list))) as mpool:
+            # Загружаем задачи в пул и запускаем итератор для получения результатов
+            for _result in mpool.imap_unordered(_is_srt_imap_unordered, _margs_list):
+                # Если один из результатов False, останавливаем цикл получения результатов
+                if _result is False:
+                    # Отменяем выполнение задач, которые еще не загружены в пул
+                    mpool.terminate()
+                    # Ожидаем завершения уже загруженных задач
+                    mpool.join()
                     break  # Прерывает цикл (for) проверки результатов
+
         return _result
     else:
         # Для небольших списков нет смысла использовать многозадачность
