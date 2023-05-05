@@ -1,3 +1,4 @@
+from itertools import pairwise
 from multiprocessing import Pool, cpu_count
 from typing import Generator, Iterable
 
@@ -16,30 +17,29 @@ def get_positive_int(value) -> int:
     Returns:
         int: Возвращает целое положительное число
     """
-    result: int = 0
-
+    _result: int = 0
     try:
-        result = int(value)
+        _result = int(value)
     except (ValueError, TypeError):
-        result = 0
+        _result = 0
     else:
-        if result < 0:
-            result *= -1
+        if _result < 0:
+            _result *= -1
     finally:
-        return result
+        return _result
 
 
-def get_ranges(list_len: int, range_len: int) -> Generator[tuple[int, int], None, None]:
+def get_ranges_index(list_len: int, range_len: int) -> Generator[tuple[int, int], None, None]:
     """
-    Функция-генератор, формирующая список диапазонов,
-    на которые можно разбить исходноый список.
+    Функция-генератор, формирующая список индексов диапазонов,
+    на которые можно разбить исходноый список длиной list_len.
 
     Args:
         list_len (int): Длина исходного списка.
         range_len (int): Размер диапазона.
 
     Yields:
-        _type_: Возвращает кортеж с начальной и конечной позицией.
+        _type_: Возвращает кортеж с начальным и конечным индексами диапазона.
     """
     # Корректируем возможные ошибки во входных параметрах
     _list_len: int = get_positive_int(list_len)
@@ -57,13 +57,13 @@ def get_ranges(list_len: int, range_len: int) -> Generator[tuple[int, int], None
             yield (i, i + _range_len) if (i + _range_len) < _list_len else (i, _list_len)
 
 
-# Обертка для _is_srt, чтобы можно было передавать кортеж
+# Обертка для _is_srt, чтобы можно было передавать кортеж с аргументами
 # в качестве единственного параметра в функции imap_unordered (см. is_sorted)
 def _is_srt_imap_unordered(_args: tuple) -> bool:
     return _is_srt(*_args)
 
 
-def _is_srt(range1: Iterable, range2: Iterable, revers: bool = False) -> bool:
+def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     """
     Вспомогательная функция, поэлементно проверяющая отсортирован ли исходный список
     в зависимости от заданного направления сортировки. При первом ложном сравнении
@@ -81,7 +81,7 @@ def _is_srt(range1: Iterable, range2: Iterable, revers: bool = False) -> bool:
     """
     _sort_order: int = -1 if revers else 1
 
-    for _current, _next in zip(range1, range2):
+    for _current, _next in pairwise(elements):
         if (_sort_order * _current) > (_sort_order * _next):
             return False
 
@@ -107,59 +107,47 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
     if (_ln := len(elements)) < 2:
         return True
 
-    _margs_list: list[tuple] = list()  # массив значений для параметров функции в режиме много задачности
     _cpu: int = cpu_count()
     _result: bool = True  # По умолчанию считаем список отсортированным
 
-    # размер минимального диапазона, на которые делится исходный список
+    # размер диапазонов, на которые делится исходный список
     _range_size: int = get_positive_int(rangesize)
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
     if _range_size == 0:
         _range_size = _cpu * CPU_FREQUENCY
 
+    _ranges_count: int = _ln // _range_size + (1 if _ln % _range_size > 0 else 0)
+
     # Если исходный список можно разделить хотя бы на 2 подсписка
     # запускаем многозадачную обработку
-    if _ln >= (_range_size * 2):
+    if _ranges_count > 1:
         # Разбиваем исходный список на диапазоны и проверяем каждый диапазон в отдельном процессе.
-        # Для каждого диапазона проверяем пограничный элемент на признак сортировки.
+        # Для каждого диапазона (кроме последнего) сравниваем последний элемент с первым элементом
+        # следующего диапазона, для чего увеличиваем конечный индекс диапазона на 1.
         # Возможна ситуация, когда два отдельный подсписка отсортированы, но целый список нет
-        # Например: [1,2,4,3,5,6]. Если разделить на два, то оба подсписка будут отсортированы,
+        # Например: [1,2,4,3,5,6]. Если разделить пополам, то оба подсписка будут отсортированы,
         # но при этом исходный список не отсортирован.
-        for i_start, i_end in get_ranges(_ln, _range_size):
-            if (i_end < _ln - 1) and (elements[i_end - 1] > elements[i_end] or elements[i_end] > elements[i_end + 1]):
-                return False
-            # Формируем список параметров для вызова функции проверки сортировки
-            # в многозадачном режиме для различных диапазонов
-            # Вместо списка передаем итераторы со смещением, дабы избежать
-            # ощутимого расхода памяти при больших исходных данных
-            _margs_list.append(
-                tuple(
-                    (
-                        iter(elements[i_start:(i_end - 1)]),
-                        iter(elements[(i_start + 1):i_end]),
-                        revers,
-                    )
-                )
-            )
+        _margs_list = (
+            (iter(elements[i_start:(i_end + 1 if i_end < _ln else i_end)]), revers)
+            for i_start, i_end in get_ranges_index(_ln, _range_size)
+        )
 
         # Запускаем пул параллельных процессов для проверки сортировки набора диапазонов
         # - результаты получаем сразу по готовности не дожидаясь завершения всех проверок
-        # - досрочное завершение обработки результатов
-        with Pool(processes=min(_cpu, len(_margs_list))) as mpool:
+        # - возможно досрочное завершение обработки результатов
+        with Pool(processes=min(_cpu, _ranges_count)) as mpool:
             # Загружаем задачи в пул и запускаем итератор для получения результатов
             for _result in mpool.imap_unordered(_is_srt_imap_unordered, _margs_list):
                 # Если один из результатов False, останавливаем цикл получения результатов
                 if _result is False:
                     # Отменяем выполнение задач, которые еще не загружены в пул
                     mpool.terminate()
-                    # Ожидаем завершения уже загруженных задач
-                    mpool.join()
                     break  # Прерывает цикл (for) проверки результатов
 
         return _result
     else:
         # Для небольших списков нет смысла использовать многозадачность
-        return _is_srt(iter(elements[:-1]), iter(elements[1:]), revers)
+        return _is_srt(iter(elements), revers)
 
 
 if __name__ == "__main__":

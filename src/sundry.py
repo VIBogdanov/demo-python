@@ -220,14 +220,14 @@ def find_item_by_binary(
         int | None: Функция dозвращает индекс элемента в массиве, который равен искомому значению.
         В случае неудачного поиска, возвращается None.
     """
-    _is_forward = True  # По умолчанию считаем входной массив отсортированным по возрастанию
+    _is_forward: bool = True  # По умолчанию считаем входной массив отсортированным по возрастанию
     if elements[0] > elements[-1]:
         _is_forward = False  # Иначе по убыванию
     # Стартуем с первого и последнего индекса массива
-    i_first = 0
-    i_last = len(elements) - 1
+    i_first: int = 0
+    i_last: int = len(elements) - 1
 
-    i_target = None  # Возвращаемый индекс найденого значения
+    i_target: int | None = None  # Возвращаемый индекс найденого значения
 
     while i_first <= i_last and i_target is None:
         i_current = (i_first + i_last) // 2  # Делим текущий остаток массива пополам
@@ -264,9 +264,9 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
     Returns:
         list: Возвращает отсортированный список
     """
-    i_start = 0
-    i_end = len(elements) - 1
-    _sort_order = -1 if revers else 1  # Задаем порядок сортировки
+    i_start: int = 0
+    i_end: int = len(elements) - 1
+    _sort_order: int = -1 if revers else 1  # Задаем порядок сортировки
 
     while i_start < i_end:
         for i_current in range(i_start, i_end, 1):

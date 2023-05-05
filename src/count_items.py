@@ -1,28 +1,27 @@
 from collections import defaultdict
 from itertools import groupby
-from typing import Union
 
 
 def count_items(
     data_list: list,
-    key: str,
+    target: str,
     operation: str = "Total",
-) -> Union[int, float, None]:
+) -> int | float | None:
     """
     Функция подсчета количества одинаковых элементов в списке элементов (по-умолчанию).
-    При этом список содержит неотсортированные и разнотипные элементы.
+    При этом список может содержать неотсортированные и разнотипные элементы.
     Кроме общего количества элементов, возможно получить минимальный или максимальный
     размер группы или подсчитать количество групп.
 
     Args:
         data_list (list): Список неупорядоченных разнотипных элементов.
 
-        key (str): Имя элемента в виде строки, для которого выполняется подсчет.
+        target (str): Имя элемента в виде строки, для которого выполняется подсчет.
 
         operation (str, optional): Вид результирующего подсчета. Defaults to "Total".
 
     Returns:
-        Union[int, float, None]: Результат подсчета в зависимости от заданного вида.
+        (int | float | None): Результат подсчета в зависимости от заданного вида.
 
     Example:
     >>> data = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a']
@@ -41,18 +40,18 @@ def count_items(
     # словарь с перечнем операций над элементами групп
     dict_operations: dict = {
         # общее количество элементов во всех группах
-        "total": lambda: sum(dict_data.get(key, [0])),
+        "total": lambda: sum(dict_data.get(target, [0])),
         # минимальный размер группы
-        "min": lambda: min(dict_data.get(key, [0])),
+        "min": lambda: min(dict_data.get(target, [0])),
         # максимальный размер группы
-        "max": lambda: max(dict_data.get(key, [0])),
+        "max": lambda: max(dict_data.get(target, [0])),
         # количество групп
-        "count": lambda: len(dict_data.get(key, [0])),
+        "count": lambda: len(dict_data.get(target, [0])),
         # ... возможно дальнейшее расширение списка операций
     }
     # список ключей из элементов и количество элементов в каждой группе
-    groups_list: list = [(str(k), len(tuple(v))) for k, v in groupby(data_list)]
-    for k, v in groups_list:
+    _groups_list = ((str(k), len(tuple(v))) for k, v in groupby(data_list))
+    for k, v in _groups_list:
         dict_data[k].append(v)
     # подсчитываем значение в зависимости от запрошенной операции
     # если вид операции задан некорректно, возвращается None
@@ -60,5 +59,4 @@ def count_items(
 
 
 if __name__ == "__main__":
-    data = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a']
-    print(count_items(data, '0'))
+    pass

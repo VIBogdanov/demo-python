@@ -1,13 +1,12 @@
 from itertools import chain
 from math import prod
-from typing import Union
 
 
 def mult_matrix(
-    matrix: list[list[Union[float, int]]],
-    min_val: Union[float, int, None] = None,
-    max_val: Union[float, int, None] = None,
-    default_val: Union[float, int] = 0.0,
+    matrix: list[list[float | int]],
+    min_val: float | int | None = None,
+    max_val: float | int | None = None,
+    default_val: float | int = 0.0,
 ) -> list[float]:
     """
     Функция получения вектора из двумерной матрицы путем перемножения
@@ -15,13 +14,13 @@ def mult_matrix(
     от min_val до max_val.
 
     Args:
-        matrix (list[list[Union[float, int]]]): двумерная числовая матрица
+        matrix (list[list[float | int]]): двумерная числовая матрица
 
-        min_val (Union[float, int, None], optional): Минимальная граница диапазона. Defaults to None.
+        min_val (float | int | None, optional): Минимальная граница диапазона. Defaults to None.
 
-        max_val (Union[float, int, None], optional): Максимальная граница диапазона. Defaults to None.
+        max_val (float | int | None, optional): Максимальная граница диапазона. Defaults to None.
 
-        default_val (Union[float, int, None], optional): Генерируемое значение в случае невозможности
+        default_val (float | int, optional): Генерируемое значение в случае невозможности
         выполнить перемножение. Defaults to 0.00.
 
     Returns:
@@ -54,16 +53,9 @@ def mult_matrix(
         # если ни один элемент из строки не удовлетворяет ограничениям, возвращаем значение по-умолчанию
         # иначе перемножаем отфильтрованные значения
         round(prod(mult_val), 3) if mult_val else default_val
-        for mult_val in [[a_col for a_col in a_str if min_val <= a_col <= max_val] for a_str in matrix]
+        for mult_val in ((a_col for a_col in a_str if min_val <= a_col <= max_val) for a_str in matrix)
     ]
 
 
 if __name__ == "__main__":
-    matrix = [
-        [1.192, 1.192, 2.255, 0.011, 2.167],
-        [1.192, 1.192, 2.255, 0.011, 2.167],
-        [2.255, 2.255, 1.734, 0.109, 5.810],
-        [0.011, 0.011, 0.109, 0.420, 1.081],
-        [2.167, 2.167, 5.810, 1.081, 0.191],
-    ]
-    print(mult_matrix(matrix, 2, 10))
+    pass
