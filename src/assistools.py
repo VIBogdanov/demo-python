@@ -1,5 +1,6 @@
 from itertools import pairwise
 from multiprocessing import Pool, cpu_count
+from time import time
 from typing import Generator, Iterable
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
@@ -31,11 +32,12 @@ def get_positive_int(value) -> int:
 
 def get_ranges_index(list_len: int, range_len: int) -> Generator[tuple[int, int], None, None]:
     """
-    Функция-генератор, формирующая список индексов диапазонов,
+    Функция-генератор, формирующая список индексов диапазонов заданной длины,
     на которые можно разбить исходноый список длиной list_len.
 
     Args:
         list_len (int): Длина исходного списка.
+
         range_len (int): Размер диапазона.
 
     Yields:
@@ -70,9 +72,7 @@ def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     итерация прерывается.
 
     Args:
-        range1 (_type_): Исходный список для проверки без последнего элемента.
-
-        range1 (_type_): Исходный список для проверки без первого элемента.
+        elements (_type_): Исходный список для проверки.
 
         revers (bool, optional): Направление сортировки. Defaults to False.
 
@@ -82,7 +82,7 @@ def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     _sort_order: int = -1 if revers else 1
 
     for _current, _next in pairwise(elements):
-        if (_sort_order * _current) > (_sort_order * _next):
+        if ((_next - _current) * _sort_order) < 0:
             return False
 
     return True
@@ -151,4 +151,8 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
 
 
 if __name__ == "__main__":
+    data = range(100_000_000)
+    start = time()
+    res = is_sorted(data)
+    print(f"Общее время выполнения is_sorted({res}):", time() - start)
     pass
