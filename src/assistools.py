@@ -74,15 +74,14 @@ def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     Args:
         elements (_type_): Исходный список для проверки.
 
-        revers (bool, optional): Направление сортировки. Defaults to False.
+        revers (bool, optional): Направление сортировки. Defaults to False - по возрастанию.
 
     Returns:
-        bool: True - список отсортирован.
+        bool: True/False - список отсортирован / не отсортирован.
     """
-    _sort_order: int = -1 if revers else 1
 
     for _current, _next in pairwise(elements):
-        if ((_next - _current) * _sort_order) < 0:
+        if (revers and (_next > _current)) or (not revers and (_current > _next)):
             return False
 
     return True
@@ -151,7 +150,7 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
 
 
 if __name__ == "__main__":
-    data = range(100_000_000)
+    data = range(10_000_000)
     start = time()
     res = is_sorted(data)
     print(f"Общее время выполнения is_sorted({res}):", time() - start)
