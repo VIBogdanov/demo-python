@@ -27,7 +27,7 @@ def find_intervals(
     Returns:
         list[tuple]: Результирующий список диапазонов элементов. Диапазоны задаются в виде
         кортежей пары целых чисел, обозначающих индексы элементов списка, включая начальный и
-        конечный индексы. Если ни один диапазон не найден, возвращается пустой список.
+        конечный индексы включительно. Если ни один диапазон не найден, возвращается пустой список.
 
     Example:
         >>> find_intervals([1, -3, 4, 5], 9)
@@ -264,24 +264,30 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
     Returns:
         list: Возвращает отсортированный список
     """
+    # создаем копию передаваемого списка, дабы не влиять на оригинальный список
+    try:
+        _elements: list = list(elements)
+    except (ValueError, TypeError):
+        return []
+
     i_start: int = 0
-    i_end: int = len(elements) - 1
+    i_end: int = len(_elements) - 1
     _sort_order: int = -1 if revers else 1  # Задаем порядок сортировки
 
     while i_start < i_end:
         for i_current in range(i_start, i_end, 1):
             # Если текущий элемент больше следующего, то переставляем их местами. Это потенциальный максимум.
-            if (_sort_order * elements[i_current]) > (_sort_order * elements[i_current + 1]):
-                elements[i_current], elements[i_current + 1] = elements[i_current + 1], elements[i_current]
+            if (_sort_order * _elements[i_current]) > (_sort_order * _elements[i_current + 1]):
+                _elements[i_current], _elements[i_current + 1] = _elements[i_current + 1], _elements[i_current]
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
-                if i_current > i_start and (_sort_order * elements[i_current]) < (_sort_order * elements[i_start]):
-                    elements[i_start], elements[i_current] = elements[i_current], elements[i_start]
+                if i_current > i_start and (_sort_order * _elements[i_current]) < (_sort_order * _elements[i_start]):
+                    _elements[i_start], _elements[i_current] = _elements[i_current], _elements[i_start]
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
         i_start += 1
         i_end -= 1
 
-    return elements
+    return _elements
 
 
 # ------------------------------------------------------------------------------------------------
@@ -297,13 +303,19 @@ def sort_by_merge(elements: list, revers: bool = False) -> list:
     Returns:
         list: Результирующий отсортированный список.
     """
-    if len(elements) > 1:
+    # создаем копию передаваемого списка, дабы не влиять на оригинальный список
+    try:
+        _elements: list = list(elements)
+    except (ValueError, TypeError):
+        return []
+
+    if len(_elements) > 1:
         # Делим исходный список пополам.
-        _i_middle: int = len(elements) // 2
+        _i_middle: int = len(_elements) // 2
         # Рекурсивно вызываем функцию до тех пор,
         # пока исходный список не будет разложен поэлементно.
-        _left_list: list = sort_by_merge(elements[:_i_middle], revers)
-        _right_list: list = sort_by_merge(elements[_i_middle:], revers)
+        _left_list: list = sort_by_merge(_elements[:_i_middle], revers)
+        _right_list: list = sort_by_merge(_elements[_i_middle:], revers)
         # Собираем список из стека рекурсивных вызовов
         _i_left: int = 0
         _i_right: int = 0
@@ -313,20 +325,20 @@ def sort_by_merge(elements: list, revers: bool = False) -> list:
         # меньший или больший элемент, в зависимости от порядка сортировки.
         while _i_left < len(_left_list) and _i_right < len(_right_list):
             if (_sort_order * _left_list[_i_left]) < (_sort_order * _right_list[_i_right]):
-                elements[_i_result] = _left_list[_i_left]
+                _elements[_i_result] = _left_list[_i_left]
                 _i_left += 1
             else:
-                elements[_i_result] = _right_list[_i_right]
+                _elements[_i_result] = _right_list[_i_right]
                 _i_right += 1
             _i_result += 1
         # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
         match (_i_left < len(_left_list), _i_right < len(_right_list)):
             case (True, False):
-                elements[_i_result:] = _left_list[_i_left:]
+                _elements[_i_result:] = _left_list[_i_left:]
             case (False, True):
-                elements[_i_result:] = _right_list[_i_right:]
-    # Следует учесть, что меняется исходный список данных и возвращается его отсортированная версия.
-    return elements
+                _elements[_i_result:] = _right_list[_i_right:]
+
+    return _elements
 
 
 # --------------------------------------------------------------------------------------------
@@ -455,20 +467,26 @@ def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -
     Returns:
         list: Отсортированный список.
     """
+    # создаем копию передаваемого списка, дабы не влиять на оригинальный список
+    try:
+        _elements: list = list(elements)
+    except (ValueError, TypeError):
+        return []
+
     _sort_order: int = -1 if revers else 1
-    _ranges = GetRangesSort(len(elements), method)
+    _ranges = GetRangesSort(len(_elements), method)
     for _range in _ranges:
-        for _i_range in range(_range, len(elements)):
+        for _i_range in range(_range, len(_elements)):
             _i_current: int = _i_range
             while (_i_current >= _range) and (
-                (_sort_order * elements[_i_current]) < (_sort_order * elements[_i_current - _range])
+                (_sort_order * _elements[_i_current]) < (_sort_order * _elements[_i_current - _range])
             ):
-                elements[_i_current], elements[_i_current - _range] = (
-                    elements[_i_current - _range],
-                    elements[_i_current],
+                _elements[_i_current], _elements[_i_current - _range] = (
+                    _elements[_i_current - _range],
+                    _elements[_i_current],
                 )
                 _i_current -= _range
-    return elements
+    return _elements
 
 
 # -------------------------------------------------------------------------------------------------
@@ -488,9 +506,15 @@ def sort_by_selection(elements: list, revers: bool = False) -> list:
     Returns:
         list: Возвращаемый отсортированный список.
     """
+    # создаем копию передаваемого списка, дабы не влиять на оригинальный список
+    try:
+        _elements: list = list(elements)
+    except (ValueError, TypeError):
+        return []
+
     # Стартуем с дипазална равного длине списка данных, кроме последнего элемента.
     i_start: int = 0
-    i_end: int = len(elements) - 1
+    i_end: int = len(_elements) - 1
     # Потенциальные минимум и максимум в начале и конце диапазона
     i_min: int = i_start
     i_max: int = i_end
@@ -500,31 +524,31 @@ def sort_by_selection(elements: list, revers: bool = False) -> list:
         # Т.к. до последнего элемента не доходим, необходимо перед итерацией
         # сравнить последний элемент с первым. Возмоно последний элемент
         # потенуиальный минимум текущего диапазона
-        if (_sort_order * elements[i_end]) < (_sort_order * elements[i_start]):
+        if (_sort_order * _elements[i_end]) < (_sort_order * _elements[i_start]):
             # Меняем местами первый и последний элементы текущего диапазона
-            elements[i_start], elements[i_end] = elements[i_end], elements[i_start]
+            _elements[i_start], _elements[i_end] = _elements[i_end], _elements[i_start]
         for i_current in range(i_start, i_end, 1):
             # Если текущий элемент больше последнего в диапазоне, то это потенциальный максимум
             # для текущего дипазона.
-            if (_sort_order * elements[i_current]) > (_sort_order * elements[i_max]):
+            if (_sort_order * _elements[i_current]) > (_sort_order * _elements[i_max]):
                 i_max = i_current
             # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
-            elif (i_current > i_start) and (_sort_order * elements[i_current]) < (_sort_order * elements[i_min]):
+            elif (i_current > i_start) and (_sort_order * _elements[i_current]) < (_sort_order * _elements[i_min]):
                 i_min = i_current
         # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
         # с начальным и/или конечным элементом текущего диапазона.
         if i_max != i_end:
-            elements[i_end], elements[i_max] = elements[i_max], elements[i_end]
+            _elements[i_end], _elements[i_max] = _elements[i_max], _elements[i_end]
         if i_min != i_start:
-            elements[i_start], elements[i_min] = elements[i_min], elements[i_start]
+            _elements[i_start], _elements[i_min] = _elements[i_min], _elements[i_start]
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
         i_start += 1
         i_end -= 1
         i_min = i_start
         i_max = i_end
-    # Следует учесть, что изменяется исходный список данных
-    return elements
+
+    return _elements
 
 
 if __name__ == "__main__":

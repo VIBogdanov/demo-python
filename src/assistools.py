@@ -150,7 +150,7 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
 
 
 if __name__ == "__main__":
-    data = range(10_000_000)
+    data = range(100_000_000)
     start = time()
     res = is_sorted(data)
     print(f"Общее время выполнения is_sorted({res}):", time() - start)
