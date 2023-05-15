@@ -1,7 +1,7 @@
+from collections.abc import Iterable, Iterator, Sequence
 from itertools import pairwise
 from multiprocessing import Pool, cpu_count
 from time import time
-from typing import Generator, Iterable
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 
@@ -30,7 +30,7 @@ def get_positive_int(value) -> int:
         return _result
 
 
-def get_ranges_index(list_len: int, range_len: int) -> Generator[tuple[int, int], None, None]:
+def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]:
     """
     Функция-генератор, формирующая список индексов диапазонов заданной длины,
     на которые можно разбить исходноый список длиной list_len.
@@ -87,7 +87,7 @@ def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     return True
 
 
-def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> bool:
+def is_sorted(elements: Sequence, revers: bool = False, rangesize: int | None = None) -> bool:
     """
     Проверяет отсортирован ли список. В случае больших списков используются
     параллельные вычисления. Для параллельных вычислений задается размер диапазонов,
@@ -109,13 +109,11 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
     _cpu: int = cpu_count()
     _result: bool = True  # По умолчанию считаем список отсортированным
 
-    # размер диапазонов, на которые делится исходный список
-    _range_size: int = get_positive_int(rangesize)
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
-    if _range_size == 0:
-        _range_size = _cpu * CPU_FREQUENCY
+    if (_range_size := get_positive_int(rangesize)) == 0:
+        _range_size = _cpu * max(round(_ln ** 0.5), CPU_FREQUENCY)
 
-    _ranges_count: int = _ln // _range_size + (1 if _ln % _range_size > 0 else 0)
+    _ranges_count: int = _ln // _range_size + int(bool(_ln % _range_size))
 
     # Если исходный список можно разделить хотя бы на 2 подсписка
     # запускаем многозадачную обработку
@@ -127,7 +125,7 @@ def is_sorted(elements, revers: bool = False, rangesize: int | None = None) -> b
         # Например: [1,2,4,3,5,6]. Если разделить пополам, то оба подсписка будут отсортированы,
         # но при этом исходный список не отсортирован.
         _margs_list = (
-            (iter(elements[i_start:(i_end + 1 if i_end < _ln else i_end)]), revers)
+            (iter(elements[i_start : (i_end + int(i_end < _ln))]), revers)  # noqa: E203
             for i_start, i_end in get_ranges_index(_ln, _range_size)
         )
 

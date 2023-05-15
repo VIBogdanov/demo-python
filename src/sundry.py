@@ -1,7 +1,7 @@
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from functools import cache, reduce
 from itertools import accumulate
-from multiprocessing import Pool, cpu_count
 from typing import Any
 
 
@@ -65,7 +65,6 @@ def find_intervals(
 def find_nearest_number(
     number: int | str,
     previous: bool = True,
-    multiproc: bool = False,
 ) -> int | None:
     """
     Функция поиска ближайшего целого числа, которое меньше или больше заданного
@@ -77,10 +76,7 @@ def find_nearest_number(
         отрицательные значения.
 
         previous (bool, optional): Направление поиска: ближайшее меньшее или
-        большее. По-умолчанию ближайшее меньшее.
-
-        multiproc (bool, optional): Использование многозадачности при поиске.
-        По-умолчанию отключено.
+        большее. По-умолчанию True - ближайшее меньшее.
 
     Returns:
         (int | None): Если поиск безуспешен, возвращается значение None.
@@ -111,44 +107,19 @@ def find_nearest_number(
             input_number *= -1  # переводим входное число на положительное значение
             search_direction *= -1  # меняем направление поиска
         # массив цифр из входного числа
-        digits_list: list[int] = [int(digit) for digit in str(input_number)]
-        # списки margs и mres используются в режиме многозадачности
-        margs_list: list = list()  # массив значений для параметров функции в режиме многозадачности
-        mres_list: tuple = tuple()  # список результатов, полученных от многозадачной функции
+        digits_list: tuple[int, ...] = tuple(int(digit) for digit in str(input_number))
+        results_list: set = set()  # список для накопления результатов поиска
         # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
         for i in range(len(digits_list) - 1, 0, -1):
-            if multiproc:  # если включен режим многозадачности
-                # сохраняем наборы входных значений в массиве
-                # передаем копию массива цифр входного числа вместо ссылки,
-                # чтобы не влиять на исходный массив при перестановке цифр внутри подпрограммы
-                margs_list.append(tuple([digits_list.copy(), i, search_direction]))
-            else:
-                # в синхронном режиме последовательно вызываем подпрограмму поиска большего
-                # или меньшего числа в зависимости от направления поиска
-                found_number = _do_find_nearest(digits_list.copy(), i, search_direction)
-                if found_number is not None:
-                    # если это первое найденное число (возможно единственное), сохраняем его как
-                    # результирующее и переходим к следующей цифре
-                    if result is None:
-                        result = found_number
-                    else:
-                        # сравниваем очередное найденное число с ранее сохраненным и выбираем большее
-                        # или меньшее из них в зависимости от направления поиска
-                        result = max(result, found_number) if search_direction == 1 else min(result, found_number)
-        # при включенном режиме многозадачности формируем пул процессов и передаем в него
-        # подпрограмму с набором различных параметров для параллельного запуска
-        if multiproc:
-            with Pool(processes=min(cpu_count(), len(margs_list))) as mpool:
-                # из возвращаемых результирующих чисел исключаем значения равные None
-                mres_list = tuple(
-                    number_value
-                    for number_value in mpool.starmap(_do_find_nearest, margs_list)
-                    if number_value is not None
-                )
-            if mres_list:
-                # если список результирующих чисел не пуст, находим наибольшее или наименьшее число
-                # в зависимости от направления поиска
-                result = max(mres_list) if search_direction == 1 else min(mres_list)
+            # вызываем подпрограмму поиска большего или меньшего числа в зависимости от направления поиска
+            results_list.add(_do_find_nearest(digits_list, i, search_direction))
+
+        results_list.discard(None)
+        if results_list:
+            # если список результирующих чисел не пуст, находим наибольшее или наименьшее число
+            # в зависимости от направления поиска
+            result = max(results_list) if search_direction == 1 else min(results_list)
+
         # если искомое число найдено и входное число было отрицательным, восстанавливаем знак минус
         if result is not None and sign_number == -1:
             result *= -1
@@ -157,7 +128,7 @@ def find_nearest_number(
 
 
 def _do_find_nearest(
-    digits_list: list[int],
+    digits_list: Sequence[int],
     current_index: int,
     search_direction: int,
 ) -> int | None:
@@ -171,7 +142,7 @@ def _do_find_nearest(
     функции find_nearest_number.
 
     Args:
-        digits_list (list[int]): Массив цифр исходного числа
+        digits_list (Sequence[int]): Массив цифр исходного числа
 
         current_index (int): Текущая позиция исходного числа
 
@@ -182,20 +153,26 @@ def _do_find_nearest(
         безуспешного поиска
 
     """
+    # создаем копию передаваемого списка, дабы не влиять на оригинальный список
+    try:
+        _digits_list: list[int] = list(digits_list)
+    except (ValueError, TypeError):
+        return None
+
     i: int = current_index  # текущая позиция исходного числа, относительно которой ведется поиск
     for k in range(i - 1, -1, -1):  # просматриваем все цифры левее текущей позиции
         # сравниваем с текущей позицией, учитывая направление поиска
-        if (search_direction * digits_list[k]) > (search_direction * digits_list[i]):
+        if (search_direction * _digits_list[k]) > (search_direction * _digits_list[i]):
             # в случае успешного сравнения, переставляем местами найденную цифру с текущей
-            digits_list[k], digits_list[i] = digits_list[i], digits_list[k]
+            _digits_list[k], _digits_list[i] = _digits_list[i], _digits_list[k]
             # если первая цифра полученного числа после перестановки не равна 0,
             # выполняем сортировку правой части числа
-            if digits_list[0] > 0:
+            if _digits_list[0] > 0:
                 k += 1  # правая часть числа начинается со сдвигом от найденной позиции
                 # сортируем правую часть числа (по возрвстанию или по убыванию) с учетом направления поиска
-                digits_list[k::] = sorted(digits_list[k::], reverse=(search_direction == 1))
+                _digits_list[k::] = sorted(_digits_list[k::], reverse=(search_direction == 1))
                 # собираем из массива цифр результирующее число
-                return reduce(lambda dig_prev, dig_next: 10 * dig_prev + dig_next, digits_list)
+                return reduce(lambda dig_prev, dig_next: 10 * dig_prev + dig_next, _digits_list)
     return None
 
 
@@ -250,7 +227,7 @@ def find_item_by_binary(
 
 
 # ----------------------------------------------------------------------------------------------------------
-def sort_by_bubble(elements: list, revers: bool = False) -> list:
+def sort_by_bubble(elements: Iterable, revers: bool = False) -> list:
     """
     Функция сортировки по методу пузырька. В отличии от классического метода, функция за каждую итерацию
     одновременно ищет как максимальное значение, так и минимальное. На следующей итерации диапазон поиска
@@ -291,7 +268,7 @@ def sort_by_bubble(elements: list, revers: bool = False) -> list:
 
 
 # ------------------------------------------------------------------------------------------------
-def sort_by_merge(elements: list, revers: bool = False) -> list:
+def sort_by_merge(elements: Iterable, revers: bool = False) -> list:
     """
     Функция сортировки методом слияния. Поддерживается сортировка как
     по возрастанию, так и по убыванию.
@@ -445,7 +422,7 @@ class GetRangesSort:
         return 0 if self.__range is None else self.__range
 
 
-def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -> list:
+def sort_by_shell(elements: Iterable, revers: bool = False, method: str = "Shell") -> list:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
     дипазанона чисел для перестановки, возможно использовать следующие методы:
@@ -490,7 +467,7 @@ def sort_by_shell(elements: list, revers: bool = False, method: str = "Shell") -
 
 
 # -------------------------------------------------------------------------------------------------
-def sort_by_selection(elements: list, revers: bool = False) -> list:
+def sort_by_selection(elements: Iterable, revers: bool = False) -> list:
     """
     Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки,
     за счет сокращения числа перестановок элементов. Элементы переставляются не на

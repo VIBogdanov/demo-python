@@ -1,6 +1,6 @@
 import pytest
 
-#  ------------------- test_permutator ------------------------------------
+#  ------------------- test_find_nearest_number ------------------------------------
 POSITION_PREV = "previous"
 POSITION_NEXT = "next"
 
@@ -15,13 +15,10 @@ def fixture_arguments_list():
             return [
                 {},
                 {"previous": True},
-                {"multiproc": False},
-                {"multiproc": True},
             ]
         elif position == POSITION_NEXT:
             return [
                 {"previous": False},
-                {"previous": False, "multiproc": True},
             ]
         else:
             return [{},]
