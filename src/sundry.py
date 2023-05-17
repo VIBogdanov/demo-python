@@ -1,13 +1,14 @@
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from functools import cache, reduce
+from functools import reduce
 from itertools import accumulate
 from typing import Any
 
 
 # ------------------------------------------------------------------------------
 def find_intervals(
-    elements: list[int],
+    elements: Iterable[int],
+    *,
     target: int = 0,
 ) -> list[tuple]:
     """
@@ -63,7 +64,8 @@ def find_intervals(
 
 # -------------------------------------------------------------------------------
 def find_nearest_number(
-    number: int | str,
+    number: int | float | str,
+    *,
     previous: bool = True,
 ) -> int | None:
     """
@@ -128,7 +130,7 @@ def find_nearest_number(
 
 
 def _do_find_nearest(
-    digits_list: Sequence[int],
+    digits_list: Iterable[int],
     current_index: int,
     search_direction: int,
 ) -> int | None:
@@ -178,7 +180,7 @@ def _do_find_nearest(
 
 # ------------------------------------------------------------------------------------
 def find_item_by_binary(
-    elements: list | tuple,
+    elements: Sequence,
     target: Any,
 ) -> int | None:
     """
@@ -227,7 +229,7 @@ def find_item_by_binary(
 
 
 # ----------------------------------------------------------------------------------------------------------
-def sort_by_bubble(elements: Iterable, revers: bool = False) -> list:
+def sort_by_bubble(elements: Iterable, *, revers: bool = False) -> list:
     """
     Функция сортировки по методу пузырька. В отличии от классического метода, функция за каждую итерацию
     одновременно ищет как максимальное значение, так и минимальное. На следующей итерации диапазон поиска
@@ -268,7 +270,7 @@ def sort_by_bubble(elements: Iterable, revers: bool = False) -> list:
 
 
 # ------------------------------------------------------------------------------------------------
-def sort_by_merge(elements: Iterable, revers: bool = False) -> list:
+def sort_by_merge(elements: Iterable, *, revers: bool = False) -> list:
     """
     Функция сортировки методом слияния. Поддерживается сортировка как
     по возрастанию, так и по убыванию.
@@ -291,8 +293,8 @@ def sort_by_merge(elements: Iterable, revers: bool = False) -> list:
         _i_middle: int = len(_elements) // 2
         # Рекурсивно вызываем функцию до тех пор,
         # пока исходный список не будет разложен поэлементно.
-        _left_list: list = sort_by_merge(_elements[:_i_middle], revers)
-        _right_list: list = sort_by_merge(_elements[_i_middle:], revers)
+        _left_list: list = sort_by_merge(_elements[:_i_middle], revers=revers)
+        _right_list: list = sort_by_merge(_elements[_i_middle:], revers=revers)
         # Собираем список из стека рекурсивных вызовов
         _i_left: int = 0
         _i_right: int = 0
@@ -332,31 +334,42 @@ class GetRangesSort:
     """
 
     def __init__(self, list_len: int, method: str = "Shell") -> None:
-        self.__len: int = list_len
+        self.__list_len: int = list_len
         self.__method: str = method.lower()
-        self.__range: int | None = None
+        self.__range: int = 0
         self.__i: int = 0
+        self.__calc_res: list[int] = list()
+
         match self.__method:
             case "hibbard":
-                while self.__get_hibbard_range(self.__i) <= self.__len:
-                    self.__i += 1
-                else:
-                    self.__i -= 1
+                _i = 1
+                while (_res := (2**_i - 1)) <= self.__list_len:
+                    self.__calc_res.append(_res)
+                    _i += 1
             case "sedgewick":
-                while self.__get_sedgewick_range(self.__i) < self.__len:
-                    self.__i += 1
-                else:
-                    self.__i -= 1
+                _i = 0
+                while (_res := self.__get_sedgewick_range(_i)) <= self.__list_len:
+                    self.__calc_res.append(_res)
+                    _i += 1
             case "knuth":
-                while self.__get_knuth_range(self.__i) < (self.__len // 3):
-                    self.__i += 1
+                _i = 1
+                while (_res := ((3**_i - 1) // 2)) <= (self.__list_len // 3):
+                    self.__calc_res.append(_res)
+                    _i += 1
             case "fibonacci":
-                while self.__get_fibonacci_range(self.__i) <= self.__len:
-                    self.__i += 1
-                else:
-                    self.__i -= 1
+                _i = 1
+                while (_res := self.__get_fibonacci_range(_i)) <= self.__list_len:
+                    self.__calc_res.append(_res)
+                    _i += 1
             case "shell" | _:
-                self.__range = None
+                _res = self.__list_len
+                while (_res := (_res // 2)) > 0:
+                    self.__calc_res.append(_res)
+                else:
+                    self.__calc_res.sort()
+
+        self.__i = len(self.__calc_res) - 1
+        self.__range = self.__calc_res[self.__i]
 
     def __iter__(self):
         return self
@@ -367,62 +380,31 @@ class GetRangesSort:
         else:
             raise StopIteration
 
-    @cache
-    def __get_hibbard_range(self, i: int) -> int:
-        return 2**i - 1
-
-    @cache
     def __get_sedgewick_range(self, i: int) -> int:
         if i % 2 == 0:
             return 9 * (2**i - 2 ** (i // 2)) + 1
         else:
             return 8 * 2**i - 6 * 2 ** ((i + 1) // 2) + 1
 
-    @cache
-    def __get_knuth_range(self, i: int) -> int:
-        return (3**i - 1) // 2
-
-    @cache
     def __get_fibonacci_range(self, i: int) -> int:
         return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
 
     @property
     def getnextrange(self) -> int:
-        match self.__method:
-            case "hibbard":
-                if self.__i > 0:
-                    self.__range = self.__get_hibbard_range(self.__i)
-                    self.__i -= 1
-                else:
-                    self.__range = 0
-            case "sedgewick":
-                if self.__i >= 0:
-                    self.__range = self.__get_sedgewick_range(self.__i)
-                    self.__i -= 1
-                else:
-                    self.__range = 0
-            case "knuth":
-                if self.__i > 0:
-                    self.__range = self.__get_knuth_range(self.__i)
-                    self.__i -= 1
-                else:
-                    self.__range = 0
-            case "fibonacci":
-                if self.__i > 0:
-                    self.__range = self.__get_fibonacci_range(self.__i)
-                    self.__i -= 1
-                else:
-                    self.__range = 0
-            case "shell" | _:
-                self.__range = (self.__len // 2) if self.__range is None else (self.__range // 2)
+        if self.__i >= 0:
+            self.__range = self.__calc_res[self.__i]
+            self.__i -= 1
+        else:
+            self.__range = 0
+
         return self.__range
 
     @property
     def getcurrentrange(self) -> int:
-        return 0 if self.__range is None else self.__range
+        return self.__range
 
 
-def sort_by_shell(elements: Iterable, revers: bool = False, method: str = "Shell") -> list:
+def sort_by_shell(elements: Iterable, *, revers: bool = False, method: str = "Shell") -> list:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
     дипазанона чисел для перестановки, возможно использовать следующие методы:
@@ -463,11 +445,12 @@ def sort_by_shell(elements: Iterable, revers: bool = False, method: str = "Shell
                     _elements[_i_current],
                 )
                 _i_current -= _range
+
     return _elements
 
 
 # -------------------------------------------------------------------------------------------------
-def sort_by_selection(elements: Iterable, revers: bool = False) -> list:
+def sort_by_selection(elements: Iterable, *, revers: bool = False) -> list:
     """
     Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки,
     за счет сокращения числа перестановок элементов. Элементы переставляются не на

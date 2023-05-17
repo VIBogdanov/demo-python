@@ -79,7 +79,6 @@ def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     Returns:
         bool: True/False - список отсортирован / не отсортирован.
     """
-
     for _current, _next in pairwise(elements):
         if (revers and (_next > _current)) or (not revers and (_current > _next)):
             return False
@@ -87,7 +86,7 @@ def _is_srt(elements: Iterable, revers: bool = False) -> bool:
     return True
 
 
-def is_sorted(elements: Sequence, revers: bool = False, rangesize: int | None = None) -> bool:
+def is_sorted(elements: Sequence, *, revers: bool = False, rangesize: int | None = None) -> bool:
     """
     Проверяет отсортирован ли список. В случае больших списков используются
     параллельные вычисления. Для параллельных вычислений задается размер диапазонов,
@@ -148,7 +147,7 @@ def is_sorted(elements: Sequence, revers: bool = False, rangesize: int | None = 
 
 
 if __name__ == "__main__":
-    data = range(100_000_000)
+    data = range(10_000_000)
     start = time()
     res = is_sorted(data)
     print(f"Общее время выполнения is_sorted({res}):", time() - start)
