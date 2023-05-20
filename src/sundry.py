@@ -2,7 +2,10 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from functools import reduce
 from itertools import accumulate
-from typing import Any
+from typing import Any, TypeAlias, TypeVar
+
+T = TypeVar('T')
+NumberValue: TypeAlias = int | float | str
 
 
 # ------------------------------------------------------------------------------
@@ -10,7 +13,7 @@ def find_intervals(
     elements: Iterable[int],
     *,
     target: int = 0,
-) -> list[tuple]:
+) -> list[tuple[int, int]]:
     """
     Поиск в списке из чисел последовательного непрерывного интервала(-ов) чисел,
     сумма которых равна искомому значению.
@@ -26,7 +29,7 @@ def find_intervals(
         target (int): Искомое целое число, для которого ищется сумма элементов списка.
 
     Returns:
-        list[tuple]: Результирующий список диапазонов элементов. Диапазоны задаются в виде
+        list[tuple[int, int]]: Результирующий список диапазонов элементов. Диапазоны задаются в виде
         кортежей пары целых чисел, обозначающих индексы элементов списка, включая начальный и
         конечный индексы включительно. Если ни один диапазон не найден, возвращается пустой список.
 
@@ -43,7 +46,7 @@ def find_intervals(
         return []
     else:
         sum_dict: defaultdict = defaultdict(list[int])
-        result_list: list[tuple] = list()
+        result_list: list[tuple[int, int]] = list()
 
         # Суммируем элементы списка по нарастающей и сохраняем в словаре
         # список индексов для каждой суммы. В качестве ключа - сама сумма.
@@ -64,7 +67,7 @@ def find_intervals(
 
 # -------------------------------------------------------------------------------
 def find_nearest_number(
-    number: int | float | str,
+    number: NumberValue,
     *,
     previous: bool = True,
 ) -> int | None:
@@ -73,7 +76,7 @@ def find_nearest_number(
     и состоит из тех же цифр.
 
     Args:
-        number (int | float | str): Целое число, относительнго которого осуществляется
+        number (int): Целое число, относительнго которого осуществляется
         поиск. Допускается строковое представление числа, положительные или
         отрицательные значения.
 
@@ -96,39 +99,40 @@ def find_nearest_number(
     """
     # если входное значение невозможно представить как целое число, возвращаем None
     try:
-        input_number: int = int(number)
+        _input_number: int = int(number)
     except (ValueError, TypeError):
         return None
     else:
-        result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
-        search_direction: int = 1 if previous else -1  # направление поиска: большее или меньшее
-        sign_number: int = 1
+        _result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
+        _previous = previous
+        _sign_number: int = 1
 
-        if input_number < 0:  # если входное число отрицательное
-            sign_number = -1  # сохраняем знак числа
-            input_number *= -1  # переводим входное число на положительное значение
-            search_direction *= -1  # меняем направление поиска
+        if _input_number < 0:  # если входное число отрицательное
+            _sign_number = -1  # сохраняем знак числа
+            _input_number *= -1  # переводим входное число на положительное значение
+            _previous = not _previous  # меняем направление поиска
+
         # массив цифр из входного числа
-        digits_list: tuple[int, ...] = tuple(int(digit) for digit in str(input_number))
+        digits_list: tuple[int, ...] = tuple(int(digit) for digit in str(_input_number))
         results_list: set = set()  # список для накопления результатов поиска
         # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
         for i in range(len(digits_list) - 1, 0, -1):
             # вызываем подпрограмму поиска большего или меньшего числа в зависимости от направления поиска
-            results_list.add(_do_find_nearest(digits_list, i, search_direction))
+            results_list.add(_do_find_nearest(digits_list, i, previous=_previous))
 
         results_list.discard(None)
         if results_list:
             # Если список результирующих чисел не пуст, находим наибольшее или наименьшее число
             # в зависимости от направления поиска. Восстанавливаем знак числа.
-            result = (max(results_list) if search_direction == 1 else min(results_list)) * sign_number
+            _result = (max(results_list) if _previous else min(results_list)) * _sign_number
 
-        return result
+        return _result
 
 
 def _do_find_nearest(
     digits_list: Iterable[int],
     current_index: int,
-    search_direction: int,
+    previous: bool = True,
 ) -> int | None:
     """
     Вспомогательная подпрограмма для функции find_nearest_number. Просматривает
@@ -142,7 +146,7 @@ def _do_find_nearest(
 
         current_index (int): Текущая позиция исходного числа
 
-        search_direction (int): Направление поиска: ближайшее большее или меньшее. True - меньшее
+        previous (bool): Направление поиска: ближайшее большее или меньшее. True - меньшее, False - большее
 
     Returns:
         (int | None): Возвращает найденное целое число или None в случае
@@ -158,7 +162,7 @@ def _do_find_nearest(
     i: int = current_index  # текущая позиция исходного числа, относительно которой ведется поиск
     for k in range(i - 1, -1, -1):  # просматриваем все цифры левее текущей позиции
         # сравниваем с текущей позицией, учитывая направление поиска
-        if (search_direction * _digits_list[k]) > (search_direction * _digits_list[i]):
+        if (_digits_list[k] > _digits_list[i]) if previous else (_digits_list[i] > _digits_list[k]):
             # в случае успешного сравнения, переставляем местами найденную цифру с текущей
             _digits_list[k], _digits_list[i] = _digits_list[i], _digits_list[k]
             # если первая цифра полученного числа после перестановки не равна 0,
@@ -166,7 +170,7 @@ def _do_find_nearest(
             if _digits_list[0] > 0:
                 k += 1  # правая часть числа начинается со сдвигом от найденной позиции
                 # сортируем правую часть числа (по возрвстанию или по убыванию) с учетом направления поиска
-                _digits_list[k::] = sorted(iter(_digits_list[k::]), reverse=(search_direction == 1))
+                _digits_list[k::] = sorted(iter(_digits_list[k::]), reverse=previous)
                 # собираем из массива цифр результирующее число
                 return reduce(lambda dig_prev, dig_next: 10 * dig_prev + dig_next, _digits_list)
     return None
@@ -222,7 +226,7 @@ def find_item_by_binary(
 
 
 # ----------------------------------------------------------------------------------------------------------
-def sort_by_bubble(elements: Iterable, *, revers: bool = False) -> list:
+def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     """
     Функция сортировки по методу пузырька. В отличии от классического метода, функция за каждую итерацию
     одновременно ищет как максимальное значение, так и минимальное. На следующей итерации диапазон поиска
@@ -244,15 +248,22 @@ def sort_by_bubble(elements: Iterable, *, revers: bool = False) -> list:
 
     i_start: int = 0
     i_end: int = len(_elements) - 1
-    _sort_order: int = -1 if revers else 1  # Задаем порядок сортировки
 
     while i_start < i_end:
         for i_current in range(i_start, i_end, 1):
             # Если текущий элемент больше следующего, то переставляем их местами. Это потенциальный максимум.
-            if (_sort_order * _elements[i_current]) > (_sort_order * _elements[i_current + 1]):
+            if (
+                (_elements[i_current + 1] > _elements[i_current])
+                if revers
+                else (_elements[i_current] > _elements[i_current + 1])
+            ):
                 _elements[i_current], _elements[i_current + 1] = _elements[i_current + 1], _elements[i_current]
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
-                if i_current > i_start and (_sort_order * _elements[i_current]) < (_sort_order * _elements[i_start]):
+                if i_current > i_start and (
+                    (_elements[i_start] < _elements[i_current])
+                    if revers
+                    else (_elements[i_current] < _elements[i_start])
+                ):
                     _elements[i_start], _elements[i_current] = _elements[i_current], _elements[i_start]
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
@@ -263,7 +274,7 @@ def sort_by_bubble(elements: Iterable, *, revers: bool = False) -> list:
 
 
 # ------------------------------------------------------------------------------------------------
-def sort_by_merge(elements: Iterable, *, revers: bool = False) -> list:
+def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     """
     Функция сортировки методом слияния. Поддерживается сортировка как
     по возрастанию, так и по убыванию.
@@ -295,8 +306,10 @@ def sort_by_merge(elements: Iterable, *, revers: bool = False) -> list:
         # Сравниваем поэлементно половинки списка и добавляем в результирующий список
         # меньший или больший элемент, в зависимости от порядка сортировки.
         while _i_left < len(_left_list) and _i_right < len(_right_list):
-            if (not revers and (_left_list[_i_left] < _right_list[_i_right])) or (
-                revers and (_right_list[_i_right] < _left_list[_i_left])
+            if (
+                (_left_list[_i_left] > _right_list[_i_right])
+                if revers
+                else (_right_list[_i_right] > _left_list[_i_left])
             ):
                 _elements[_i_result] = _left_list[_i_left]
                 _i_left += 1
@@ -364,7 +377,7 @@ class GetRangesSort:
 
     def __iter__(self):  # позволяет итерировать класс
         # Возвращаемый генератор поддерживает интерфейс итератора
-        return (_res for _res in self.__calc_res[-1::-1])
+        return (_res for _res in self.__calc_res[::-1])
 
     # позволяет применять к классу срезы и вести себя как последовательность
     def __len__(self):
@@ -395,7 +408,7 @@ class GetRangesSort:
         return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
 
 
-def sort_by_shell(elements: Iterable, *, revers: bool = False, method: str = "Shell") -> list:
+def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: str = "Shell") -> list[T]:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
     дипазанона чисел для перестановки, возможно использовать следующие методы:
@@ -424,6 +437,7 @@ def sort_by_shell(elements: Iterable, *, revers: bool = False, method: str = "Sh
         return []
 
     if (len(_elements)) > 1:
+        # Создаем экземпляр класса, который будет генерировать диапазоны выборки
         _ranges = GetRangesSort(len(_elements), method)
         for _range in _ranges:
             for _i_range in range(_range, len(_elements)):
@@ -443,7 +457,7 @@ def sort_by_shell(elements: Iterable, *, revers: bool = False, method: str = "Sh
 
 
 # -------------------------------------------------------------------------------------------------
-def sort_by_selection(elements: Iterable, *, revers: bool = False) -> list:  # noqa: C901
+def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]:  # noqa: C901
     """
     Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки,
     за счет сокращения числа перестановок элементов. Элементы переставляются не на
@@ -472,24 +486,24 @@ def sort_by_selection(elements: Iterable, *, revers: bool = False) -> list:  # n
         # Потенциальные минимум и максимум в начале и конце диапазона
         i_min: int = i_start
         i_max: int = i_end
-        _sort_order: int = -1 if revers else 1  # Задаем порядок сортировки
+
         # Перебираем диапазоны, сокращая длину каждого следующего диапазона на 2
         while i_start < i_end:
             # Т.к. до последнего элемента не доходим, необходимо перед итерацией
             # сравнить последний элемент с первым. Возмоно последний элемент
             # потенуиальный минимум текущего диапазона
-            if (not revers and (_elements[i_end] < _elements[i_start])) or (
-                revers and (_elements[i_start] < _elements[i_end])
-            ):
+            if (_elements[i_end] > _elements[i_start]) if revers else (_elements[i_start] > _elements[i_end]):
                 # Меняем местами первый и последний элементы текущего диапазона
                 _elements[i_start], _elements[i_end] = _elements[i_end], _elements[i_start]
             for i_current in range(i_start, i_end, 1):
                 # Если текущий элемент больше последнего в диапазоне, то это потенциальный максимум
                 # для текущего дипазона.
-                if (_sort_order * _elements[i_current]) > (_sort_order * _elements[i_max]):
+                if (_elements[i_max] > _elements[i_current]) if revers else (_elements[i_current] > _elements[i_max]):
                     i_max = i_current
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
-                elif (i_current > i_start) and (_sort_order * _elements[i_current]) < (_sort_order * _elements[i_min]):
+                elif (i_current > i_start) and (
+                    (_elements[i_min] < _elements[i_current]) if revers else (_elements[i_current] < _elements[i_min])
+                ):
                     i_min = i_current
             # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
             # с начальным и/или конечным элементом текущего диапазона.
