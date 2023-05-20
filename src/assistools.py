@@ -2,32 +2,34 @@ from collections.abc import Iterable, Iterator, Sequence
 from itertools import pairwise
 from multiprocessing import Pool, cpu_count
 from time import time
+from typing import TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
+T = TypeVar('T')
+NumNone: TypeAlias = int | float | str | None
 
 
-def get_positive_int(value) -> int:
+def get_positive_int(value: NumNone) -> int:
     """
     Проверяет значение на положительное целое.
     Если переданное значение невозможно представить как целое число,
     вернет ноль. Отрицательное число конвертирует в положительное.
 
     Args:
-        value (_type_): Значение для проверки
+        value (NumNone): Значение для проверки. Число или None
 
     Returns:
         int: Возвращает целое положительное число
     """
-    _result: int = 0
+    if value is None:
+        return 0
+
     try:
-        _result = int(value)
+        _result: int = int(value)
     except (ValueError, TypeError):
         _result = 0
-    else:
-        if _result < 0:
-            _result *= -1
-    finally:
-        return _result
+
+    return abs(_result)
 
 
 def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]:
@@ -41,7 +43,7 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]
         range_len (int): Размер диапазона.
 
     Yields:
-        _type_: Возвращает кортеж с начальным и конечным индексами диапазона.
+        tuple[int, int]: Возвращает кортеж с начальным и конечным индексами диапазона.
     """
     # Корректируем возможные ошибки во входных параметрах
     _list_len: int = get_positive_int(list_len)
@@ -59,34 +61,33 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]
             yield (i, i + _range_len) if (i + _range_len) < _list_len else (i, _list_len)
 
 
-# Обертка для _is_srt, чтобы можно было передавать кортеж с аргументами
-# в качестве единственного параметра в функции imap_unordered (см. is_sorted)
-def _is_srt_imap_unordered(_args: tuple) -> bool:
-    return _is_srt(*_args)
-
-
-def _is_srt(elements: Iterable, revers: bool = False) -> bool:
+def _is_srt(args: tuple[Iterable, bool]) -> bool:
     """
     Вспомогательная функция, поэлементно проверяющая отсортирован ли исходный список
     в зависимости от заданного направления сортировки. При первом ложном сравнении
     итерация прерывается.
 
     Args:
-        elements (_type_): Исходный список для проверки.
-
-        revers (bool, optional): Направление сортировки. Defaults to False - по возрастанию.
+        args (tuple[Iterable, bool]): Кортеж параметров - список для проверки и
+        направление сортировки
 
     Returns:
         bool: True/False - список отсортирован / не отсортирован.
     """
-    for _current, _next in pairwise(elements):
-        if (revers and (_next > _current)) or (not revers and (_current > _next)):
+    _elements, _revers = args
+    for _current, _next in pairwise(_elements):
+        if (_next > _current) if _revers else (_current > _next):
             return False
 
     return True
 
 
-def is_sorted(elements: Sequence, *, revers: bool = False, rangesize: int | None = None) -> bool:
+def is_sorted(
+    elements: Sequence[T],
+    *,
+    revers: bool = False,
+    rangesize: int | None = None,
+) -> bool:
     """
     Проверяет отсортирован ли список. В случае больших списков используются
     параллельные вычисления. Для параллельных вычислений задается размер диапазонов,
@@ -94,7 +95,7 @@ def is_sorted(elements: Sequence, *, revers: bool = False, rangesize: int | None
     процессе. При проверке учитывается порядок сортировки.
 
     Args:
-        elements (_type_): Список для проверки.
+        elements (Sequence): Список для проверки.
         revers (bool, optional): Порядок сортировки. Defaults to False.
         rangesize (int | None): Размер диапазона, на который можно разбить список. Defaults to None.
 
@@ -110,7 +111,7 @@ def is_sorted(elements: Sequence, *, revers: bool = False, rangesize: int | None
 
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
     if (_range_size := get_positive_int(rangesize)) == 0:
-        _range_size = _cpu * max(round(_ln ** 0.5), CPU_FREQUENCY)
+        _range_size = _cpu * max(round(_ln**0.5), CPU_FREQUENCY)
 
     _ranges_count: int = _ln // _range_size + int(bool(_ln % _range_size))
 
@@ -133,7 +134,7 @@ def is_sorted(elements: Sequence, *, revers: bool = False, rangesize: int | None
         # - возможно досрочное завершение обработки результатов
         with Pool(processes=min(_cpu, _ranges_count)) as mpool:
             # Загружаем задачи в пул и запускаем итератор для получения результатов
-            for _result in mpool.imap_unordered(_is_srt_imap_unordered, _margs_list):
+            for _result in mpool.imap_unordered(_is_srt, _margs_list):
                 # Если один из результатов False, останавливаем цикл получения результатов
                 if _result is False:
                     # Отменяем выполнение задач, которые еще не загружены в пул
@@ -143,7 +144,7 @@ def is_sorted(elements: Sequence, *, revers: bool = False, rangesize: int | None
         return _result
     else:
         # Для небольших списков нет смысла использовать многозадачность
-        return _is_srt(iter(elements), revers)
+        return _is_srt((iter(elements), revers))
 
 
 if __name__ == "__main__":
