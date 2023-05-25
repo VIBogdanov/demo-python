@@ -1,10 +1,10 @@
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from functools import reduce
 from itertools import accumulate
 from typing import Any, TypeAlias, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 NumberValue: TypeAlias = int | float | str
 
 
@@ -123,7 +123,7 @@ def find_nearest_number(
         results_list.discard(None)
         if results_list:
             # Если список результирующих чисел не пуст, находим наибольшее или наименьшее число
-            # в зависимости от направления поиска. Восстанавливаем знак числа.
+            # в зависимости от направления поиска и восстанавливаем знак числа.
             _result = (max(results_list) if _previous else min(results_list)) * _sign_number
 
         return _result
@@ -186,6 +186,7 @@ def find_item_by_binary(
     так называемый, алгоритм бинарного поиска. Суть алгоритма: на каждой итерации сравнивать срединный
     элемент массива с искомым значением. Далее выяснить в какой из половинок массива находится искомое
     значение и выбрать эту половину для дальнейшего деления, пока не будет найдено совпадение.
+
     Внимание!!! Входной массив данных обязательно должен быть отсортирован. Функция учитывает
     направление сортировки - по возрастанию или убыванию.
 
@@ -197,6 +198,15 @@ def find_item_by_binary(
         int | None: Функция dозвращает индекс элемента в массиве, который равен искомому значению.
         В случае неудачного поиска, возвращается None.
     """
+    # Исключаем пустые и односимвольные списки
+    match len(elements):
+        case 0:
+            return None
+        case 1:
+            try:
+                return 0 if elements[0] == target else None
+            except (ValueError, TypeError):
+                return None
     # Определяем порядок сортировки исходного массива
     _is_forward: bool = True if elements[-1] > elements[0] else False
     # Стартуем с первого и последнего индекса массива
@@ -223,6 +233,79 @@ def find_item_by_binary(
             return None
 
     return i_target
+
+
+# ---------------------------------------------find_item_by_interpolation---------------------------------------------
+def find_item_by_interpolation(
+    elements: Sequence[int | float],
+    target: int | float,
+) -> int | None:
+    """
+    Функция поиска заданного значения в одномерном числовом массиве. В качестве алгоритма поиска используется
+    метод интерполяции. Алгоритм похож на бинарный поиск. Отличие в способе поиска срединного элемента.
+    При интерполяции производится попытка вычислить положение искомого элемента, а не просто поделить список
+    пополам.
+
+    Внимание!!! Входной массив данных обязательно должен быть отсортирован. Функция учитывает
+    направление сортировки - по возрастанию или убыванию. Т.к. в алгоритме используются арифметические
+    операции, список и искомое значение должны быть числовыми. Строковые литералы не поддерживаются.
+
+    Args:
+        elements (Sequence[int | float]): Массив числовых данных для поиска
+        target (int | float): Значение, которое необходимо найти
+
+    Returns:
+        int | None: Индекс элемента в массиве, который равен искомому значению.
+        В случае неудачного поиска, возвращается None.
+    """
+    # Исключаем пустые и односимвольные списки
+    match len(elements):
+        case 0:
+            return None
+        case 1:
+            try:
+                return 0 if elements[0] == target else None
+            except (ValueError, TypeError):
+                return None
+    # Определяем порядок сортировки исходного массива
+    _sort_order: int = 1 if elements[-1] > elements[0] else -1
+    # Стартуем с первого и последнего индекса массива
+    _i_first: int = 0
+    _i_end: int = len(elements) - 1
+    _i_target: int | None = None  # Возвращаемый индекс найденого значения
+
+    while _i_first <= _i_end and _i_target is None:
+        # Если искомый элемент вне проверяемого диапазона, выходим из цикла
+        if ((_sort_order * target) < (_sort_order * elements[_i_first])) or (
+            (_sort_order * target) > (_sort_order * elements[_i_end])
+        ):
+            break
+
+        try:
+            # Пытаемся вычислить положение искомого элемента в списке. При этом не важно направление сортировки.
+            # Возможно деление на ноль, которое перехватывается в блоке except.
+            _i_current = _i_first + int(
+                (((_i_end - _i_first) / (elements[_i_end] - elements[_i_first])) * (target - elements[_i_first]))
+            )
+
+            match ...:  # Сравниваем срединный элемент с искомым значением
+                # Если искомое значение найдено, прекращаем дальнейший поиск и возвращаем найденный индекс
+                case _ if elements[_i_current] == target:
+                    _i_target = _i_current
+                # В двух других случаях смещаем начальный или конечный индексы в зависимости от
+                # результата сравнения текущего элемента с искомым значением и от направления сортировки
+                case _ if elements[_i_current] > target:
+                    _i_first, _i_end = (_i_first, _i_current - 1) if _sort_order == 1 else (_i_current + 1, _i_end)
+                case _ if elements[_i_current] < target:
+                    _i_first, _i_end = (_i_current + 1, _i_end) if _sort_order == 1 else (_i_first, _i_current - 1)
+        # Обрабатываем исключение в случае невозможности сравнить искомое значение с элементом массива
+        except (ValueError, TypeError):
+            return None
+        # Возможно все элементы списка одинаковые. Тогда возникает ситуация - деление на ноль
+        except ZeroDivisionError:
+            return _i_first if elements[_i_first] == target else None
+
+    return _i_target
 
 
 # ----------------------------------------------------------------------------------------------------------
@@ -375,12 +458,12 @@ class GetRangesSort:
                 else:
                     self.__calc_res.sort()
 
-    def __iter__(self):  # позволяет итерировать класс
+    def __iter__(self) -> Iterator[int]:  # позволяет итерировать класс
         # Возвращаемый генератор поддерживает интерфейс итератора
         return (_res for _res in self.__calc_res[::-1])
 
     # позволяет применять к классу срезы и вести себя как последовательность
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.__calc_res)
 
     # позволяет применять к классу срезы и вести себя как последовательность

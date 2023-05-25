@@ -169,11 +169,11 @@ def fixture_data_results() -> dict:
 # -------------------- find_intervals ------------------------------------
 # ... - означает отсутствие параметра
 _find_intervals_data: list[tuple] = [
-    ([1, -3, 4, 5], {"target": 9}, [(2, 3)], "target=9"),
-    ([1, -3, 4, 5], {"target": 0}, [], "target=0"),
+    ([1, -3, 4, 5], dict(target=9), [(2, 3)], "target=9"),
+    ([1, -3, 4, 5], dict(target=0), [], "target=0"),
     ([1, -3, 4, 5], ..., [], "target=..."),
-    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], {"target": 9}, [(0, 4), (2, 4), (1, 5), (4, 8), (7, 8), (4, 10), (7, 10)], "target=9"),
-    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], {"target": 0}, [(0, 1), (4, 6), (8, 9), (9, 10)], "target=0"),
+    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], dict(target=9), [(0, 4), (2, 4), (1, 5), (4, 8), (7, 8), (4, 10), (7, 10)], "target=9"),
+    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], dict(target=0), [(0, 1), (4, 6), (8, 9), (9, 10)], "target=0"),
     ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], ..., [(0, 1), (4, 6), (8, 9), (9, 10)], "target=..."),
 ]
 
@@ -190,11 +190,11 @@ def fixture_find_intervals_data(request) -> tuple:
 # ... - означает отсутствие параметра
 _find_intervals_invalid_parameters: list[tuple] = [
     ([], ..., [], "target=..."),
-    ([1, -3, 4, 5], {"target": 1.2}, [(0, 0), (1, 2)], "target=1.2"),
-    ([1, -3, 4, 5], {"target": '9'}, [(2, 3)], "target='9'"),
-    ([1, -3, 4, 5], {"target": '1.2'}, [], "target='1.2'"),
-    ([1, -3, 4, 5], {"target": None}, [], "target=None"),
-    ((1, -3, 4, 5), {"target": 9.0}, [(2, 3)], "target=9.0"),
+    ([1, -3, 4, 5], dict(target=1.2), [(0, 0), (1, 2)], "target=1.2"),
+    ([1, -3, 4, 5], dict(target='9'), [(2, 3)], "target='9'"),
+    ([1, -3, 4, 5], dict(target='1.2'), [], "target='1.2'"),
+    ([1, -3, 4, 5], dict(target=None), [], "target=None"),
+    ((1, -3, 4, 5), dict(target=9.0), [(2, 3)], "target=9.0"),
 ]
 
 
@@ -208,12 +208,12 @@ def fixture_find_intervals_invalid_parameters(request) -> tuple:
 
 
 _find_intervals_fail: list[tuple] = [
-    ([1, -3, '4', 5], {"target": 9}, [], "target=9"),
-    ("'1, -3, 4, 5'", {"target": 9}, [], "target=9"),
-    (27, {"target": 27}, [], "target=27"),
-    (12.5, {"target": 12}, [], "target=12"),
-    (None, {"target": 0}, [], "target=0"),
-    ({'x': 45, }, {"target": 45}, [], "target=45"),
+    ([1, -3, '4', 5], dict(target=9), [], "target=9"),
+    ("'1, -3, 4, 5'", dict(target=9), [], "target=9"),
+    (27, dict(target=27), [], "target=27"),
+    (12.5, dict(target=12), [], "target=12"),
+    (None, dict(target=0), [], "target=0"),
+    ({'x': 45, }, dict(target=45), [], "target=45"),
 ]
 
 
