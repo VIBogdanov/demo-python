@@ -1,5 +1,6 @@
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
+from enum import Enum
 from functools import reduce
 from itertools import accumulate
 from typing import Any, TypeAlias, TypeVar
@@ -104,7 +105,7 @@ def find_nearest_number(
         return None
     else:
         _result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
-        _previous = previous
+        _previous: bool = previous
         _sign_number: int = 1
 
         if _input_number < 0:  # если входное число отрицательное
@@ -114,13 +115,13 @@ def find_nearest_number(
 
         # массив цифр из входного числа
         digits_list: tuple[int, ...] = tuple(int(digit) for digit in str(_input_number))
-        results_list: set = set()  # список для накопления результатов поиска
+        results_list: set[int] = set()  # список для накопления результатов поиска
         # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
         for i in range(len(digits_list) - 1, 0, -1):
             # вызываем подпрограмму поиска большего или меньшего числа в зависимости от направления поиска
-            results_list.add(_do_find_nearest(digits_list, i, previous=_previous))
+            if (_res := _do_find_nearest(digits_list, i, previous=_previous)) is not None:
+                results_list.add(_res)
 
-        results_list.discard(None)
         if results_list:
             # Если список результирующих чисел не пуст, находим наибольшее или наименьшее число
             # в зависимости от направления поиска и восстанавливаем знак числа.
@@ -411,6 +412,14 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
 
 # --------------------------------------------------------------------------------------------
+class SortMethod(str, Enum):
+    SHELL = "Shell"
+    HIBBARD = "Hibbard"
+    SEDGEWICK = "Sedgewick"
+    KNUTH = "Knuth"
+    FIBONACCI = "Fibonacci"
+
+
 class GetRangesSort:
     """
     Вспомогательный класс для функции sort_by_shell(). Реализует различные методы формирования
@@ -425,33 +434,32 @@ class GetRangesSort:
 
     __slots__ = ("__list_len", "__method", "__calc_res")
 
-    def __init__(self, list_len: int, method: str = "Shell") -> None:
+    def __init__(self, list_len: int, method: SortMethod = SortMethod.SHELL) -> None:
         self.__list_len: int = list_len
-        self.__method: str = method.lower()
         self.__calc_res: list[int] = list()
-
-        match self.__method:
-            case "hibbard":
+        # Исходя из заданного метода, вычисляем на какие диапазоны можно разбить исходный список
+        match method:
+            case SortMethod.HIBBARD:
                 _i = 1
                 while (_res := (2**_i - 1)) <= self.__list_len:
                     self.__calc_res.append(_res)
                     _i += 1
-            case "sedgewick":
+            case SortMethod.SEDGEWICK:
                 _i = 0
                 while (_res := self.__get_sedgewick_range(_i)) <= self.__list_len:
                     self.__calc_res.append(_res)
                     _i += 1
-            case "knuth":
+            case SortMethod.KNUTH:
                 _i = 1
                 while (_res := ((3**_i - 1) // 2)) <= (self.__list_len // 3):
                     self.__calc_res.append(_res)
                     _i += 1
-            case "fibonacci":
+            case SortMethod.FIBONACCI:
                 _i = 1
                 while (_res := self.__get_fibonacci_range(_i)) <= self.__list_len:
                     self.__calc_res.append(_res)
                     _i += 1
-            case "shell" | _:
+            case SortMethod.SHELL | _:
                 _res = self.__list_len
                 while (_res := (_res // 2)) > 0:
                     self.__calc_res.append(_res)
@@ -491,7 +499,7 @@ class GetRangesSort:
         return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
 
 
-def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: str = "Shell") -> list[T]:
+def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: SortMethod = SortMethod.SHELL) -> list[T]:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
     дипазанона чисел для перестановки, возможно использовать следующие методы:
@@ -507,7 +515,7 @@ def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: str = 
 
         revers (bool, optional): Если задано True, то сортировка по убыванию.. Defaults to False.
 
-        method (str, optional): Мотод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth,
+        method (SortMethod, optional): Мотод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth,
         Fibonacci. Defaults to "Shell".
 
     Returns:
@@ -542,7 +550,7 @@ def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: str = 
 # -------------------------------------------------------------------------------------------------
 def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]:  # noqa: C901
     """
-    Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки,
+    Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки
     за счет сокращения числа перестановок элементов. Элементы переставляются не на
     каждом шаге итерации, а только лишь в конце текущей итерации. Дополнительно к
     классическому алгоритму добавлена возможность одновременного поиска максимального
@@ -554,7 +562,7 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
         revers (bool, optional): Если задано True, список сортируется по убыванию. Defaults to False.
 
     Returns:
-        list: Возвращаемый отсортированный список.
+        list: Возвращает отсортированный список.
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
     try:

@@ -1,22 +1,21 @@
 from collections.abc import Iterable, Iterator, Sequence
 from itertools import pairwise
 from multiprocessing import Pool, cpu_count
-from time import time
-from typing import TypeAlias, TypeVar
+from typing import NamedTuple, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
-T = TypeVar('T')
-NumNone: TypeAlias = int | float | str | None
+T = TypeVar("T")
+NumberStrNone: TypeAlias = int | float | str | None
 
 
-def get_positive_int(value: NumNone) -> int:
+def get_positive_int(value: NumberStrNone) -> int:
     """
     Проверяет значение на положительное целое.
     Если переданное значение невозможно представить как целое число,
     вернет ноль. Отрицательное число конвертирует в положительное.
 
     Args:
-        value (NumNone): Значение для проверки. Число или None
+        value (NumberNone): Значение для проверки. Число или None
 
     Returns:
         int: Возвращает целое положительное число
@@ -32,7 +31,12 @@ def get_positive_int(value: NumNone) -> int:
     return abs(_result)
 
 
-def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]:
+class RangeIndex(NamedTuple):
+    start: int
+    end: int
+
+
+def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
     """
     Функция-генератор, формирующая список индексов диапазонов заданной длины,
     на которые можно разбить исходноый список длиной list_len.
@@ -43,7 +47,7 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]
         range_len (int): Размер диапазона.
 
     Yields:
-        tuple[int, int]: Возвращает кортеж с начальным и конечным индексами диапазона.
+        Iterator[RangeIndex]: Возвращает кортеж с начальным и конечным индексами диапазона.
     """
     # Корректируем возможные ошибки во входных параметрах
     _list_len: int = get_positive_int(list_len)
@@ -55,10 +59,10 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[tuple[int, int]]
             (_range_len < 1),
         )
     ):
-        yield (0, _list_len)
+        yield RangeIndex(0, _list_len)
     else:
         for i in range(0, _list_len, _range_len):
-            yield (i, i + _range_len) if (i + _range_len) < _list_len else (i, _list_len)
+            yield RangeIndex(i, i + _range_len) if (i + _range_len) < _list_len else RangeIndex(i, _list_len)
 
 
 def _is_srt(args: tuple[Iterable, bool]) -> bool:
@@ -148,6 +152,7 @@ def is_sorted(
 
 
 if __name__ == "__main__":
+    from time import time
     data = range(10_000_000)
     start = time()
     res = is_sorted(data)
