@@ -1,7 +1,7 @@
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
-from functools import reduce
+from functools import cache, reduce
 from itertools import accumulate
 from typing import Any, TypeAlias, TypeVar
 
@@ -42,7 +42,7 @@ def find_intervals(
         [(0, 1), (4, 6), (8, 9), (9, 10)]
     """
     try:
-        target = int(target)
+        _target = int(target)
     except (ValueError, TypeError):
         return []
     else:
@@ -54,11 +54,11 @@ def find_intervals(
         for id_to, sum_accum in enumerate(accumulate(elements)):
             # Если на очередной итерации полученная сумма равна искомому значению,
             # заносим диапазон от 0 до текущей позиции в результирующий список.
-            if sum_accum == target:
+            if sum_accum == _target:
                 result_list.append((0, id_to))
             # Ищем пару из уже вычисленных ранее сумм для значения (Sum - Target).
             # Если пара найдена, извлекаем индексы и формируем результирующие диапазоны.
-            for id_from in sum_dict.get((sum_accum - target), []):
+            for id_from in sum_dict.get((sum_accum - _target), []):
                 result_list.append((id_from + 1, id_to))
             # Сохраняем очередную сумму и ее индекс в словаре, где ключ - сама сумма.
             sum_dict[sum_accum].append(id_to)
@@ -77,7 +77,7 @@ def find_nearest_number(
     и состоит из тех же цифр.
 
     Args:
-        number (int): Целое число, относительнго которого осуществляется
+        number (int | float | str): Целое число, относительнго которого осуществляется
         поиск. Допускается строковое представление числа, положительные или
         отрицательные значения.
 
@@ -100,34 +100,34 @@ def find_nearest_number(
     """
     # если входное значение невозможно представить как целое число, возвращаем None
     try:
-        _input_number: int = int(number)
+        input_number: int = int(number)
     except (ValueError, TypeError):
         return None
     else:
-        _result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
-        _previous: bool = previous
-        _sign_number: int = 1
+        result: int | None = None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
+        is_previous: bool = previous
+        sign_number: int = 1
 
-        if _input_number < 0:  # если входное число отрицательное
-            _sign_number = -1  # сохраняем знак числа
-            _input_number *= -1  # переводим входное число на положительное значение
-            _previous = not _previous  # меняем направление поиска
+        if input_number < 0:  # если входное число отрицательное
+            sign_number = -1  # сохраняем знак числа
+            input_number *= -1  # переводим входное число на положительное значение
+            is_previous = not is_previous  # меняем направление поиска
 
-        # массив цифр из входного числа
-        digits_list: tuple[int, ...] = tuple(int(digit) for digit in str(_input_number))
-        results_list: set[int] = set()  # список для накопления результатов поиска
+        # формируем массив цифр из входного числа
+        digits_list: tuple[int, ...] = tuple(map(int, str(input_number)))
+        results_list: list[int] = list()  # список для накопления результатов поиска
         # цикл перебора цифр входного числа справа на лево (с хвоста к голове) кроме первой цифры
         for i in range(len(digits_list) - 1, 0, -1):
             # вызываем подпрограмму поиска большего или меньшего числа в зависимости от направления поиска
-            if (_res := _do_find_nearest(digits_list, i, previous=_previous)) is not None:
-                results_list.add(_res)
+            if (res := _do_find_nearest(digits_list, i, previous=is_previous)) is not None:
+                results_list.append(res)
 
         if results_list:
             # Если список результирующих чисел не пуст, находим наибольшее или наименьшее число
             # в зависимости от направления поиска и восстанавливаем знак числа.
-            _result = (max(results_list) if _previous else min(results_list)) * _sign_number
+            result = (max(results_list) if is_previous else min(results_list)) * sign_number
 
-        return _result
+        return result
 
 
 def _do_find_nearest(
@@ -156,24 +156,24 @@ def _do_find_nearest(
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
     try:
-        _digits_list: list[int] = list(digits_list)
+        dig_list: list[int] = list(digits_list)
     except (ValueError, TypeError):
         return None
 
     i: int = current_index  # текущая позиция исходного числа, относительно которой ведется поиск
     for k in range(i - 1, -1, -1):  # просматриваем все цифры левее текущей позиции
         # сравниваем с текущей позицией, учитывая направление поиска
-        if (_digits_list[k] > _digits_list[i]) if previous else (_digits_list[i] > _digits_list[k]):
+        if (dig_list[k] > dig_list[i]) if previous else (dig_list[i] > dig_list[k]):
             # в случае успешного сравнения, переставляем местами найденную цифру с текущей
-            _digits_list[k], _digits_list[i] = _digits_list[i], _digits_list[k]
+            dig_list[k], dig_list[i] = dig_list[i], dig_list[k]
             # если первая цифра полученного числа после перестановки не равна 0,
             # выполняем сортировку правой части числа
-            if _digits_list[0] > 0:
+            if dig_list[0] > 0:
                 k += 1  # правая часть числа начинается со сдвигом от найденной позиции
                 # сортируем правую часть числа (по возрвстанию или по убыванию) с учетом направления поиска
-                _digits_list[k::] = sorted(iter(_digits_list[k::]), reverse=previous)
+                dig_list[k::] = sorted(iter(dig_list[k::]), reverse=previous)
                 # собираем из массива цифр результирующее число
-                return reduce(lambda dig_prev, dig_next: 10 * dig_prev + dig_next, _digits_list)
+                return reduce(lambda dig_prev, dig_next: 10 * dig_prev + dig_next, dig_list)
     return None
 
 
@@ -209,7 +209,7 @@ def find_item_by_binary(
             except (ValueError, TypeError):
                 return None
     # Определяем порядок сортировки исходного массива
-    _is_forward: bool = True if elements[-1] > elements[0] else False
+    is_forward: bool = True if elements[-1] > elements[0] else False
     # Стартуем с первого и последнего индекса массива
     i_first: int = 0
     i_last: int = len(elements) - 1
@@ -226,9 +226,9 @@ def find_item_by_binary(
                 # В двух других случаях смещаем начальный или конечный индексы в зависимости от
                 # результата сравнения текущего элемента с искомым значением и от направления сортировки
                 case (cur, trg) if cur > trg:
-                    i_first, i_last = (i_first, i_current - 1) if _is_forward else (i_current + 1, i_last)
+                    i_first, i_last = (i_first, i_current - 1) if is_forward else (i_current + 1, i_last)
                 case (cur, trg) if cur < trg:
-                    i_first, i_last = (i_current + 1, i_last) if _is_forward else (i_first, i_current - 1)
+                    i_first, i_last = (i_current + 1, i_last) if is_forward else (i_first, i_current - 1)
         # Обрабатываем исключение в случае невозможности сравнить искомое значение с элементом массива
         except (ValueError, TypeError):
             return None
@@ -269,44 +269,44 @@ def find_item_by_interpolation(
             except (ValueError, TypeError):
                 return None
     # Определяем порядок сортировки исходного массива
-    _sort_order: int = 1 if elements[-1] > elements[0] else -1
+    sort_order: int = 1 if elements[-1] > elements[0] else -1
     # Стартуем с первого и последнего индекса массива
-    _i_first: int = 0
-    _i_end: int = len(elements) - 1
-    _i_target: int | None = None  # Возвращаемый индекс найденого значения
+    i_first: int = 0
+    i_end: int = len(elements) - 1
+    i_target: int | None = None  # Возвращаемый индекс найденого значения
 
-    while _i_first <= _i_end and _i_target is None:
+    while i_first <= i_end and i_target is None:
         # Если искомый элемент вне проверяемого диапазона, выходим из цикла
-        if ((_sort_order * target) < (_sort_order * elements[_i_first])) or (
-            (_sort_order * target) > (_sort_order * elements[_i_end])
+        if ((sort_order * target) < (sort_order * elements[i_first])) or (
+            (sort_order * target) > (sort_order * elements[i_end])
         ):
-            break
+            return i_target
 
         try:
             # Пытаемся вычислить положение искомого элемента в списке. При этом не важно направление сортировки.
             # Возможно деление на ноль, которое перехватывается в блоке except.
-            _i_current = _i_first + int(
-                (((_i_end - _i_first) / (elements[_i_end] - elements[_i_first])) * (target - elements[_i_first]))
+            i_current = i_first + int(
+                (((i_end - i_first) / (elements[i_end] - elements[i_first])) * (target - elements[i_first]))
             )
 
             match ...:  # Сравниваем срединный элемент с искомым значением
                 # Если искомое значение найдено, прекращаем дальнейший поиск и возвращаем найденный индекс
-                case _ if elements[_i_current] == target:
-                    _i_target = _i_current
+                case _ if elements[i_current] == target:
+                    i_target = i_current
                 # В двух других случаях смещаем начальный или конечный индексы в зависимости от
                 # результата сравнения текущего элемента с искомым значением и от направления сортировки
-                case _ if elements[_i_current] > target:
-                    _i_first, _i_end = (_i_first, _i_current - 1) if _sort_order == 1 else (_i_current + 1, _i_end)
-                case _ if elements[_i_current] < target:
-                    _i_first, _i_end = (_i_current + 1, _i_end) if _sort_order == 1 else (_i_first, _i_current - 1)
+                case _ if elements[i_current] > target:
+                    i_first, i_end = (i_first, i_current - 1) if sort_order == 1 else (i_current + 1, i_end)
+                case _ if elements[i_current] < target:
+                    i_first, i_end = (i_current + 1, i_end) if sort_order == 1 else (i_first, i_current - 1)
         # Обрабатываем исключение в случае невозможности сравнить искомое значение с элементом массива
         except (ValueError, TypeError):
             return None
         # Возможно все элементы списка одинаковые. Тогда возникает ситуация - деление на ноль
         except ZeroDivisionError:
-            return _i_first if elements[_i_first] == target else None
+            return i_first if elements[i_first] == target else None
 
-    return _i_target
+    return i_target
 
 
 # ----------------------------------------------------------------------------------------------------------
@@ -378,35 +378,35 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
     if len(_elements) > 1:
         # Делим исходный список пополам.
-        _i_middle: int = len(_elements) // 2
+        i_middle: int = len(_elements) // 2
         # Рекурсивно вызываем функцию до тех пор,
         # пока исходный список не будет разложен поэлементно.
-        _left_list: list = sort_by_merge(_elements[:_i_middle], revers=revers)
-        _right_list: list = sort_by_merge(_elements[_i_middle:], revers=revers)
+        left_list: list = sort_by_merge(_elements[:i_middle], revers=revers)
+        right_list: list = sort_by_merge(_elements[i_middle:], revers=revers)
         # Собираем список из стека рекурсивных вызовов
-        _i_left: int = 0
-        _i_right: int = 0
-        _i_result: int = 0
+        i_left: int = 0
+        i_right: int = 0
+        i_result: int = 0
         # Сравниваем поэлементно половинки списка и добавляем в результирующий список
         # меньший или больший элемент, в зависимости от порядка сортировки.
-        while _i_left < len(_left_list) and _i_right < len(_right_list):
+        while i_left < len(left_list) and i_right < len(right_list):
             if (
-                (_left_list[_i_left] > _right_list[_i_right])
+                (left_list[i_left] > right_list[i_right])
                 if revers
-                else (_right_list[_i_right] > _left_list[_i_left])
+                else (right_list[i_right] > left_list[i_left])
             ):
-                _elements[_i_result] = _left_list[_i_left]
-                _i_left += 1
+                _elements[i_result] = left_list[i_left]
+                i_left += 1
             else:
-                _elements[_i_result] = _right_list[_i_right]
-                _i_right += 1
-            _i_result += 1
+                _elements[i_result] = right_list[i_right]
+                i_right += 1
+            i_result += 1
         # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
-        match (_i_left < len(_left_list), _i_right < len(_right_list)):
+        match (i_left < len(left_list), i_right < len(right_list)):
             case (True, False):
-                _elements[_i_result:] = _left_list[_i_left:]
+                _elements[i_result:] = left_list[i_left:]
             case (False, True):
-                _elements[_i_result:] = _right_list[_i_right:]
+                _elements[i_result:] = right_list[i_right:]
 
     return _elements
 
@@ -440,35 +440,35 @@ class GetRangesSort:
         # Исходя из заданного метода, вычисляем на какие диапазоны можно разбить исходный список
         match method:
             case SortMethod.HIBBARD:
-                _i = 1
-                while (_res := (2**_i - 1)) <= self.__list_len:
-                    self.__calc_res.append(_res)
-                    _i += 1
+                i = 1
+                while (res := (2**i - 1)) <= self.__list_len:
+                    self.__calc_res.append(res)
+                    i += 1
             case SortMethod.SEDGEWICK:
-                _i = 0
-                while (_res := self.__get_sedgewick_range(_i)) <= self.__list_len:
-                    self.__calc_res.append(_res)
-                    _i += 1
+                i = 0
+                while (res := self.__get_sedgewick_range(i)) <= self.__list_len:
+                    self.__calc_res.append(res)
+                    i += 1
             case SortMethod.KNUTH:
-                _i = 1
-                while (_res := ((3**_i - 1) // 2)) <= (self.__list_len // 3):
-                    self.__calc_res.append(_res)
-                    _i += 1
+                i = 1
+                while (res := ((3**i - 1) // 2)) <= (self.__list_len // 3):
+                    self.__calc_res.append(res)
+                    i += 1
             case SortMethod.FIBONACCI:
-                _i = 1
-                while (_res := self.__get_fibonacci_range(_i)) <= self.__list_len:
-                    self.__calc_res.append(_res)
-                    _i += 1
+                i = 1
+                while (res := self.__get_fibonacci_range(i)) <= self.__list_len:
+                    self.__calc_res.append(res)
+                    i += 1
             case SortMethod.SHELL | _:
-                _res = self.__list_len
-                while (_res := (_res // 2)) > 0:
-                    self.__calc_res.append(_res)
+                res = self.__list_len
+                while (res := (res // 2)) > 0:
+                    self.__calc_res.append(res)
                 else:
                     self.__calc_res.sort()
 
     def __iter__(self) -> Iterator[int]:  # позволяет итерировать класс
         # Возвращаемый генератор поддерживает интерфейс итератора
-        return (_res for _res in self.__calc_res[::-1])
+        return (res for res in self.__calc_res[::-1])
 
     # позволяет применять к классу срезы и вести себя как последовательность
     def __len__(self) -> int:
@@ -495,11 +495,17 @@ class GetRangesSort:
         else:
             return 8 * 2**i - 6 * 2 ** ((i + 1) // 2) + 1
 
+    @cache
     def __get_fibonacci_range(self, i: int) -> int:
         return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
 
 
-def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: SortMethod = SortMethod.SHELL) -> list[T]:
+def sort_by_shell(
+    elements: Iterable[T],
+    *,
+    revers: bool = False,
+    method: SortMethod = SortMethod.SHELL,
+) -> list[T]:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
     дипазанона чисел для перестановки, возможно использовать следующие методы:
@@ -529,20 +535,20 @@ def sort_by_shell(elements: Iterable[T], *, revers: bool = False, method: SortMe
 
     if (len(_elements)) > 1:
         # Создаем экземпляр класса, который будет генерировать диапазоны выборки
-        _ranges = GetRangesSort(len(_elements), method)
-        for _range in _ranges:
-            for _i_range in range(_range, len(_elements)):
-                _i_current: int = _i_range
-                while (_i_current >= _range) and (
-                    (_elements[_i_current] > _elements[_i_current - _range])
+        ranges_list = GetRangesSort(len(_elements), method)
+        for range_item in ranges_list:
+            for i_range in range(range_item, len(_elements)):
+                i_current: int = i_range
+                while (i_current >= range_item) and (
+                    (_elements[i_current] > _elements[i_current - range_item])
                     if revers
-                    else (_elements[_i_current - _range] > _elements[_i_current])
+                    else (_elements[i_current - range_item] > _elements[i_current])
                 ):
-                    _elements[_i_current], _elements[_i_current - _range] = (
-                        _elements[_i_current - _range],
-                        _elements[_i_current],
+                    _elements[i_current], _elements[i_current - range_item] = (
+                        _elements[i_current - range_item],
+                        _elements[i_current],
                     )
-                    _i_current -= _range
+                    i_current -= range_item
 
     return _elements
 

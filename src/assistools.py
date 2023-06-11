@@ -4,7 +4,7 @@ from multiprocessing import Pool, cpu_count
 from typing import NamedTuple, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
-T = TypeVar("T")
+TAny = TypeVar("TAny")
 NumberStrNone: TypeAlias = int | float | str | None
 
 
@@ -24,11 +24,11 @@ def get_positive_int(value: NumberStrNone) -> int:
         return 0
 
     try:
-        _result: int = int(value)
+        result: int = int(value)
     except (ValueError, TypeError):
-        _result = 0
+        result = 0
 
-    return abs(_result)
+    return abs(result)
 
 
 class RangeIndex(NamedTuple):
@@ -78,16 +78,18 @@ def _is_srt(args: tuple[Iterable, bool]) -> bool:
     Returns:
         bool: True/False - список отсортирован / не отсортирован.
     """
-    _elements, _revers = args
-    for _current, _next in pairwise(_elements):
-        if (_next > _current) if _revers else (_current > _next):
+    elements, is_revers = args
+    # Используем pairwise вместо zip (который немного быстрее), т.к. _elements - это итератор.
+    # В zip невозможно по одному итератору пройтись дважды со смещением в 1 элемент.
+    for current, next in pairwise(elements):
+        if (next > current) if is_revers else (current > next):
             return False
 
     return True
 
 
 def is_sorted(
-    elements: Sequence[T],
+    elements: Sequence[TAny],
     *,
     revers: bool = False,
     rangesize: int | None = None,
@@ -95,11 +97,11 @@ def is_sorted(
     """
     Проверяет отсортирован ли список. В случае больших списков используются
     параллельные вычисления. Для параллельных вычислений задается размер диапазонов,
-    на котрые разбивается исходный список. Каждый диапазон проверяется в отдельном
+    на которые разбивается исходный список. Каждый диапазон проверяется в отдельном
     процессе. При проверке учитывается порядок сортировки.
 
     Args:
-        elements (Sequence): Список для проверки.
+        elements (Sequence): Массив данных для проверки.
         revers (bool, optional): Порядок сортировки. Defaults to False.
         rangesize (int | None): Размер диапазона, на который можно разбить список. Defaults to None.
 
@@ -107,45 +109,45 @@ def is_sorted(
         bool: True, если список отсортирован.
     """
     # Пустые списки или списки из одного элемента всегда отсортированы
-    if (_ln := len(elements)) < 2:
+    if (ln := len(elements)) < 2:
         return True
 
-    _cpu: int = cpu_count()
-    _result: bool = True  # По умолчанию считаем список отсортированным
+    cpu: int = cpu_count()
+    result: bool = True  # По умолчанию считаем список отсортированным
 
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
-    if (_range_size := get_positive_int(rangesize)) == 0:
-        _range_size = _cpu * max(round(_ln**0.5), CPU_FREQUENCY)
+    if (range_size := get_positive_int(rangesize)) == 0:
+        range_size = cpu * max(round(ln**0.5), CPU_FREQUENCY)
 
-    _ranges_count: int = _ln // _range_size + int(bool(_ln % _range_size))
+    ranges_count: int = ln // range_size + int(bool(ln % range_size))
 
     # Если исходный список можно разделить хотя бы на 2 подсписка
     # запускаем многозадачную обработку
-    if _ranges_count > 1:
+    if ranges_count > 1:
         # Разбиваем исходный список на диапазоны и проверяем каждый диапазон в отдельном процессе.
         # Для каждого диапазона (кроме последнего) сравниваем последний элемент с первым элементом
         # следующего диапазона, для чего увеличиваем конечный индекс диапазона на 1.
         # Возможна ситуация, когда два отдельный подсписка отсортированы, но целый список нет
         # Например: [1,2,4,3,5,6]. Если разделить пополам, то оба подсписка будут отсортированы,
         # но при этом исходный список не отсортирован.
-        _margs_list = (
-            (iter(elements[i_start : (i_end + int(i_end < _ln))]), revers)  # noqa: E203
-            for i_start, i_end in get_ranges_index(_ln, _range_size)
+        margs_list = (
+            (iter(elements[i_start : (i_end + int(i_end < ln))]), revers)  # noqa: E203
+            for i_start, i_end in get_ranges_index(ln, range_size)
         )
 
         # Запускаем пул параллельных процессов для проверки сортировки набора диапазонов
         # - результаты получаем сразу по готовности не дожидаясь завершения всех проверок
         # - возможно досрочное завершение обработки результатов
-        with Pool(processes=min(_cpu, _ranges_count)) as mpool:
-            # Загружаем задачи в пул и запускаем итератор для получения результатов
-            for _result in mpool.imap_unordered(_is_srt, _margs_list):
+        with Pool(processes=min(cpu, ranges_count)) as mpool:
+            # Загружаем задачи в пул и запускаем итератор для получения результатов по мере готовности
+            for result in mpool.imap_unordered(_is_srt, margs_list):
                 # Если один из результатов False, останавливаем цикл получения результатов
-                if _result is False:
+                if result is False:
                     # Отменяем выполнение задач, которые еще не загружены в пул
                     mpool.terminate()
                     break  # Прерывает цикл (for) проверки результатов
 
-        return _result
+        return result
     else:
         # Для небольших списков нет смысла использовать многозадачность
         return _is_srt((iter(elements), revers))

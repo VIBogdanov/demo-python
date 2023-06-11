@@ -21,7 +21,10 @@ def fixture_arguments_list():
                 {"previous": False},
             ]
         else:
-            return [{},]
+            return [
+                {},
+            ]
+
     return _fixture_arguments_list
 
 
@@ -101,7 +104,7 @@ def fixture_numbers_list_int(request) -> dict:
 
 
 #  ------------------- test_count_items ------------------------------------
-_data_list: list = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a']
+_data_list: list = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, "a", "a", "a"]
 
 
 @pytest.fixture(
@@ -125,7 +128,7 @@ def fixture_data_item(request) -> str:
     return request.param
 
 
-_operations_list: list[str] = ['total', 'min', 'max', 'count']
+_operations_list: list[str] = ["total", "min", "max", "count"]
 
 
 @pytest.fixture(
@@ -172,7 +175,12 @@ _find_intervals_data: list[tuple] = [
     ([1, -3, 4, 5], dict(target=9), [(2, 3)], "target=9"),
     ([1, -3, 4, 5], dict(target=0), [], "target=0"),
     ([1, -3, 4, 5], ..., [], "target=..."),
-    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], dict(target=9), [(0, 4), (2, 4), (1, 5), (4, 8), (7, 8), (4, 10), (7, 10)], "target=9"),
+    (
+        [1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5],
+        dict(target=9),
+        [(0, 4), (2, 4), (1, 5), (4, 8), (7, 8), (4, 10), (7, 10)],
+        "target=9",
+    ),
     ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], dict(target=0), [(0, 1), (4, 6), (8, 9), (9, 10)], "target=0"),
     ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], ..., [(0, 1), (4, 6), (8, 9), (9, 10)], "target=..."),
 ]
@@ -181,7 +189,7 @@ _find_intervals_data: list[tuple] = [
 @pytest.fixture(
     name="find_intervals_data",
     params=_find_intervals_data,
-    ids=lambda item: f'({item[0]}, {item[3]}) -> {item[2]}',
+    ids=lambda item: f"({item[0]}, {item[3]}) -> {item[2]}",
 )
 def fixture_find_intervals_data(request) -> tuple:
     return request.param
@@ -191,8 +199,8 @@ def fixture_find_intervals_data(request) -> tuple:
 _find_intervals_invalid_parameters: list[tuple] = [
     ([], ..., [], "target=..."),
     ([1, -3, 4, 5], dict(target=1.2), [(0, 0), (1, 2)], "target=1.2"),
-    ([1, -3, 4, 5], dict(target='9'), [(2, 3)], "target='9'"),
-    ([1, -3, 4, 5], dict(target='1.2'), [], "target='1.2'"),
+    ([1, -3, 4, 5], dict(target="9"), [(2, 3)], "target='9'"),
+    ([1, -3, 4, 5], dict(target="1.2"), [], "target='1.2'"),
     ([1, -3, 4, 5], dict(target=None), [], "target=None"),
     ((1, -3, 4, 5), dict(target=9.0), [(2, 3)], "target=9.0"),
 ]
@@ -201,19 +209,26 @@ _find_intervals_invalid_parameters: list[tuple] = [
 @pytest.fixture(
     name="find_intervals_invalid",
     params=_find_intervals_invalid_parameters,
-    ids=lambda item: f'({item[0]}, {item[3]}) -> {item[2]}',
+    ids=lambda item: f"({item[0]}, {item[3]}) -> {item[2]}",
 )
 def fixture_find_intervals_invalid_parameters(request) -> tuple:
     return request.param
 
 
 _find_intervals_fail: list[tuple] = [
-    ([1, -3, '4', 5], dict(target=9), [], "target=9"),
+    ([1, -3, "4", 5], dict(target=9), [], "target=9"),
     ("'1, -3, 4, 5'", dict(target=9), [], "target=9"),
     (27, dict(target=27), [], "target=27"),
     (12.5, dict(target=12), [], "target=12"),
     (None, dict(target=0), [], "target=0"),
-    ({'x': 45, }, dict(target=45), [], "target=45"),
+    (
+        {
+            "x": 45,
+        },
+        dict(target=45),
+        [],
+        "target=45",
+    ),
 ]
 
 
@@ -221,7 +236,7 @@ _find_intervals_fail: list[tuple] = [
 @pytest.fixture(
     name="find_intervals_fail",
     params=_find_intervals_fail,
-    ids=lambda item: f'({item[0]}, {item[3]}) -> {item[2]}',
+    ids=lambda item: f"({item[0]}, {item[3]}) -> {item[2]}",
 )
 def fixture_find_intervals_fail(request) -> tuple:
     return request.param
