@@ -1,7 +1,7 @@
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
-from functools import cache, reduce
+from functools import reduce
 from itertools import accumulate
 from typing import Any, TypeAlias, TypeVar
 
@@ -454,10 +454,8 @@ class GetRangesSort:
                     self.__calc_res.append(res)
                     i += 1
             case SortMethod.FIBONACCI:
-                i = 1
-                while (res := self.__get_fibonacci_number(i)) <= list_len:
+                for res in self.__get_fibonacci_gen(list_len):
                     self.__calc_res.append(res)
-                    i += 1
             case SortMethod.SHELL | _:
                 res = list_len
                 while (res := (res // 2)) > 0:
@@ -493,26 +491,16 @@ class GetRangesSort:
         else:
             return 8 * 2**i - 6 * 2 ** ((i + 1) // 2) + 1
 
-    @cache  # Имеет смысл для рекурсивного варианта. Оставлено для совместимости
-    def __get_fibonacci_number(self, i: int) -> int:
+    def __get_fibonacci_gen(self, ln: int):
         """
         Формирует отличную от классической последовательность: вместо [1,1,2,3,5...] получаем [1,2,3,5...]
         Дублирование первых двух единиц не требуется.
         """
-        # Вариант с рекурсивным вызовом функции. Чреват потенциальным переполнением стека.
-        # return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
-
-        # Вариант без рекурсии с вычислениями в цикле
-        if i < 2:
-            return 1
-        else:
-            prev: int = 1
-            res: int = 1
-            n: int = 1
-            while n < i:
-                res, prev = (prev + res), res
-                n += 1
-            return res
+        prev: int = 1
+        curr: int = 1
+        while curr <= ln:
+            yield curr
+            curr, prev = (prev + curr), curr
 
 
 def sort_by_shell(
@@ -634,4 +622,6 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
 
 if __name__ == "__main__":
+    lst = [4, 6, 3, 8, 1, 2, 9, 7]
+    print(sort_by_shell(lst, method=SortMethod.FIBONACCI))
     pass
