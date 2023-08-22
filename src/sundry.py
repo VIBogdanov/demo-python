@@ -18,7 +18,7 @@ def find_intervals(
     """
     Поиск в списке из чисел последовательного непрерывного интервала(-ов) чисел,
     сумма которых равна искомому значению.
-    Суть алгоритма выражена формулой: Sum1 - Sum2 = Target > Sum1 - Target = Sum2
+    Суть алгоритма выражена формулой: Sum1 - Sum2 = Target >> Sum1 - Target = Sum2
       - Вычислить все суимы от начала до текущей позиции.
       - Для каждой суммы вычислить Sum - Target
       - Найти полученное значение в списке сумм
@@ -42,7 +42,7 @@ def find_intervals(
         [(0, 1), (4, 6), (8, 9), (9, 10)]
     """
     try:
-        _target = int(target)
+        _target: int = int(target)
     except (ValueError, TypeError):
         return []
     else:
@@ -209,26 +209,25 @@ def find_item_by_binary(
             except (ValueError, TypeError):
                 return None
     # Определяем порядок сортировки исходного массива
-    is_forward: bool = True if elements[-1] > elements[0] else False
-    # Стартуем с первого и последнего индекса массива
+    is_forward: bool = bool(elements[-1] >= elements[0])
+    # Стартуем с первого и последнего индекса массива одновременно
     i_first: int = 0
     i_last: int = len(elements) - 1
 
     i_target: int | None = None  # Возвращаемый индекс найденого значения
 
     while i_first <= i_last and i_target is None:
-        i_current = (i_first + i_last) // 2  # Делим текущий остаток массива пополам
+        i_current: int = (i_first + i_last) // 2  # Делим текущий остаток массива пополам
         try:
             match (elements[i_current], target):  # Сравниваем срединный элемент с искомым значением
-                # Если искомое значение найдено, прекращаем дальнейший поиск и возвращаем найденный индекс
-                case (cur, trg) if cur == trg:
-                    i_target = i_current
-                # В двух других случаях смещаем начальный или конечный индексы в зависимости от
-                # результата сравнения текущего элемента с искомым значением и от направления сортировки
+                # Смещаем начальный или конечный индексы в зависимости от результата сравнения
+                # текущего элемента с искомым значением и от направления сортировки
                 case (cur, trg) if cur > trg:
                     i_first, i_last = (i_first, i_current - 1) if is_forward else (i_current + 1, i_last)
                 case (cur, trg) if cur < trg:
                     i_first, i_last = (i_current + 1, i_last) if is_forward else (i_first, i_current - 1)
+                case _:  # В противном случае искомое значение найдено
+                    i_target = i_current
         # Обрабатываем исключение в случае невозможности сравнить искомое значение с элементом массива
         except (ValueError, TypeError):
             return None
@@ -270,7 +269,7 @@ def find_item_by_interpolation(
                 return None
     # Определяем порядок сортировки исходного массива
     sort_order: int = 1 if elements[-1] > elements[0] else -1
-    # Стартуем с первого и последнего индекса массива
+    # Стартуем с первого и последнего индекса массива одновременно
     i_first: int = 0
     i_end: int = len(elements) - 1
     i_target: int | None = None  # Возвращаемый индекс найденого значения
@@ -319,6 +318,7 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
     Args:
         elements (Iterable): Список данных для сортировки
+
         revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
 
     Returns:
@@ -432,35 +432,34 @@ class GetRangesSort:
     - Fibonacci
     """
 
-    __slots__ = ("__list_len", "__method", "__calc_res")
+    __slots__ = ("__calc_res")
 
     def __init__(self, list_len: int, method: SortMethod = SortMethod.SHELL) -> None:
-        self.__list_len: int = list_len
         self.__calc_res: list[int] = list()
         # Исходя из заданного метода, вычисляем на какие диапазоны можно разбить исходный список
         match method:
             case SortMethod.HIBBARD:
                 i = 1
-                while (res := (2**i - 1)) <= self.__list_len:
+                while (res := (2**i - 1)) <= list_len:
                     self.__calc_res.append(res)
                     i += 1
             case SortMethod.SEDGEWICK:
                 i = 0
-                while (res := self.__get_sedgewick_range(i)) <= self.__list_len:
+                while (res := self.__get_sedgewick_range(i)) <= list_len:
                     self.__calc_res.append(res)
                     i += 1
             case SortMethod.KNUTH:
                 i = 1
-                while (res := ((3**i - 1) // 2)) <= (self.__list_len // 3):
+                while (res := ((3**i - 1) // 2)) <= (list_len // 3):
                     self.__calc_res.append(res)
                     i += 1
             case SortMethod.FIBONACCI:
                 i = 1
-                while (res := self.__get_fibonacci_range(i)) <= self.__list_len:
+                while (res := self.__get_fibonacci_number(i)) <= list_len:
                     self.__calc_res.append(res)
                     i += 1
             case SortMethod.SHELL | _:
-                res = self.__list_len
+                res = list_len
                 while (res := (res // 2)) > 0:
                     self.__calc_res.append(res)
                 else:
@@ -468,6 +467,7 @@ class GetRangesSort:
 
     def __iter__(self) -> Iterator[int]:  # позволяет итерировать класс
         # Возвращаемый генератор поддерживает интерфейс итератора
+        # Итерируем в обратном порядке от большего к меньшему
         return (res for res in self.__calc_res[::-1])
 
     # позволяет применять к классу срезы и вести себя как последовательность
@@ -479,15 +479,13 @@ class GetRangesSort:
         match index:
             case int() | slice():
                 return self.__calc_res[index]
-            case str() | float():
+            case _:
                 try:
                     index = int(index)
                 except (ValueError, TypeError):
                     return []
                 else:
                     return self.__calc_res[index]
-            case _:
-                return []
 
     def __get_sedgewick_range(self, i: int) -> int:
         if i % 2 == 0:
@@ -495,9 +493,26 @@ class GetRangesSort:
         else:
             return 8 * 2**i - 6 * 2 ** ((i + 1) // 2) + 1
 
-    @cache
-    def __get_fibonacci_range(self, i: int) -> int:
-        return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
+    @cache  # Имеет смысл для рекурсивного варианта. Оставлено для совместимости
+    def __get_fibonacci_number(self, i: int) -> int:
+        """
+        Формирует отличную от классической последовательность: вместо [1,1,2,3,5...] получаем [1,2,3,5...]
+        Дублирование первых двух единиц не требуется.
+        """
+        # Вариант с рекурсивным вызовом функции. Чреват потенциальным переполнением стека.
+        # return (self.__get_fibonacci_range(i - 2) + self.__get_fibonacci_range(i - 1)) if i > 1 else 1
+
+        # Вариант без рекурсии с вычислениями в цикле
+        if i < 2:
+            return 1
+        else:
+            prev: int = 1
+            res: int = 1
+            n: int = 1
+            while n < i:
+                res, prev = (prev + res), res
+                n += 1
+            return res
 
 
 def sort_by_shell(

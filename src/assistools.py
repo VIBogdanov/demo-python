@@ -79,7 +79,7 @@ def _is_srt(args: tuple[Iterable, bool]) -> bool:
         bool: True/False - список отсортирован / не отсортирован.
     """
     elements, is_revers = args
-    # Используем pairwise вместо zip (который немного быстрее), т.к. _elements - это итератор.
+    # Используем pairwise вместо zip (который немного быстрее), т.к. elements - это итератор.
     # В zip невозможно по одному итератору пройтись дважды со смещением в 1 элемент.
     for current, next in pairwise(elements):
         if (next > current) if is_revers else (current > next):
@@ -129,7 +129,7 @@ def is_sorted(
         # следующего диапазона, для чего увеличиваем конечный индекс диапазона на 1.
         # Возможна ситуация, когда два отдельный подсписка отсортированы, но целый список нет
         # Например: [1,2,4,3,5,6]. Если разделить пополам, то оба подсписка будут отсортированы,
-        # но при этом исходный список не отсортирован.
+        # но при этом исходный полный список не отсортирован.
         margs_list = (
             (iter(elements[i_start : (i_end + int(i_end < ln))]), revers)  # noqa: E203
             for i_start, i_end in get_ranges_index(ln, range_size)
