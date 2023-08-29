@@ -1,5 +1,4 @@
-from collections.abc import Iterable, Iterator, Sequence
-from itertools import pairwise
+from collections.abc import Iterator, Sequence
 from multiprocessing import Pool, cpu_count
 from typing import NamedTuple, TypeAlias, TypeVar
 
@@ -65,7 +64,7 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
             yield RangeIndex(i, i + _range_len) if (i + _range_len) < _list_len else RangeIndex(i, _list_len)
 
 
-def _is_srt(args: tuple[Iterable, bool]) -> bool:
+def _is_srt(args: tuple[Iterator, bool]) -> bool:
     """
     Вспомогательная функция, поэлементно проверяющая отсортирован ли исходный список
     в зависимости от заданного направления сортировки. При первом ложном сравнении
@@ -79,11 +78,16 @@ def _is_srt(args: tuple[Iterable, bool]) -> bool:
         bool: True/False - список отсортирован / не отсортирован.
     """
     elements, is_revers = args
-    # Используем pairwise вместо zip (который немного быстрее), т.к. elements - это итератор.
-    # В zip невозможно по одному итератору пройтись дважды со смещением в 1 элемент.
-    for current, next in pairwise(elements):
-        if (next > current) if is_revers else (current > next):
+
+    try:
+        _prev = next(elements)
+    except StopIteration:
+        return True
+
+    for _next in elements:
+        if (_next > _prev) if is_revers else (_prev > _next):
             return False
+        _prev = _next
 
     return True
 

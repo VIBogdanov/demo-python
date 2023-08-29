@@ -622,6 +622,4 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
 
 if __name__ == "__main__":
-    lst = [4, 6, 3, 8, 1, 2, 9, 7]
-    print(sort_by_shell(lst, method=SortMethod.FIBONACCI))
     pass
