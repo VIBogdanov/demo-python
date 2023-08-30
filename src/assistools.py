@@ -1,4 +1,4 @@
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from multiprocessing import Pool, cpu_count
 from typing import NamedTuple, TypeAlias, TypeVar
 
@@ -106,7 +106,9 @@ def is_sorted(
 
     Args:
         elements (Sequence): Массив данных для проверки.
+
         revers (bool, optional): Порядок сортировки. Defaults to False.
+
         rangesize (int | None): Размер диапазона, на который можно разбить список. Defaults to None.
 
     Returns:
@@ -157,8 +159,41 @@ def is_sorted(
         return _is_srt((iter(elements), revers))
 
 
+def get_number_permutations(source_list: Iterable[TAny], target_list: Iterable[TAny]) -> int:
+    """
+    Подсчитывает минимальное количество перестановок, которое необходимо произвести для того,
+    чтобы из исходного списка source_list получить целевой список target_list. При этом порядок
+    следования и непрерывность списков не имеют значения.
+    Например для списков:
+    [10, 31, 15, 22, 14, 17, 16]
+    [16, 22, 14, 10, 31, 15, 17]
+    Требуется выполнить три перестановки для приведения списков в идентичное состояние.
+
+    Args:
+        source_list (Iterable[TAny]): Исходный список
+
+        target_list (Iterable[TAny]): Целевой список
+
+    Returns:
+        int: Минимальное количество перестановок
+    """
+    target_index: dict[TAny, int] = {n: i for i, n in enumerate(target_list)}
+    source_index_generator = (target_index[source_item] for source_item in source_list)
+    count: int = 0
+    prev_item = next(source_index_generator)
+
+    for next_item in source_index_generator:
+        if prev_item > next_item:
+            count += 1
+        else:
+            prev_item = next_item
+
+    return count
+
+
 if __name__ == "__main__":
     from time import time
+
     data = range(10_000_000)
     start = time()
     res = is_sorted(data)
