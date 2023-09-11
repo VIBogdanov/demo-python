@@ -177,11 +177,16 @@ def get_number_permutations(source_list: Iterable[TAny], target_list: Iterable[T
     Returns:
         int: Минимальное количество перестановок
     """
+    # формируем список из номеров позиций для каждого значения из целевого списка.
+    # Само значения является ключем.
     target_index: dict[TAny, int] = {n: i for i, n in enumerate(target_list)}
+    # Генератор, который формирует номер позиции, на которую нужно переставить значение из исходного списка.
     source_index_generator = (target_index[source_item] for source_item in source_list)
     count: int = 0
+    # Получаем целевой номер позиции для первого значения из исходного списка
     prev_item = next(source_index_generator)
-
+    # Попарно сравниваем целевые номера позиций для значений исходного списка.
+    # Если номера позиций не по возрастанию, то требуется перестановка
     for next_item in source_index_generator:
         if prev_item > next_item:
             count += 1

@@ -1,9 +1,10 @@
-from collections import defaultdict
+
+from collections import defaultdict, deque
 from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
-from typing import Any, TypeAlias, TypeVar
+from typing import Any, NamedTuple, TypeAlias, TypeVar
 
 T = TypeVar("T")
 NumberValue: TypeAlias = int | float | str
@@ -179,7 +180,7 @@ def _do_find_nearest(
 
 # ------------------------------------------------------------------------------------
 def find_item_by_binary(
-    elements: Sequence,
+    elements: Sequence[Any],
     target: Any,
 ) -> int | None:
     """
@@ -192,7 +193,7 @@ def find_item_by_binary(
     направление сортировки - по возрастанию или убыванию.
 
     Args:
-        elements (Sequence): Массив данных для поиска
+        elements (Sequence[Any]): Массив данных для поиска
         target (Any): Значение, которое необходимо найти
 
     Returns:
@@ -412,6 +413,87 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
 
 # --------------------------------------------------------------------------------------------
+class MergeRanges(NamedTuple):
+    """
+    Вспомогательный именованный кортеж для функции sort_by_merge2()
+    """
+    first_index: int
+    middle_index: int
+    last_index: int
+
+
+def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
+    """
+    Усовершенствованная версия функции сортировки методом слияния (см. sort_by_merge). В отличии
+    от оригинальной версии не использует рекурсивные вызовы и не создает каскад списков.
+    Вместо этого создается список индексов для диапазонов сортировки, по которым происходит отбор
+    значений из списка источника и их сортировка.
+
+    Args:
+        elements (Iterable[T]): Список данных для сортировки.
+
+        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+
+    Returns:
+        list[T]: Результирующий отсортированный список.
+    """
+    # Создаем копию списка, на котором будем производить сортировку. Он же будет результирующим.
+    try:
+        _elements: list[T] = list(elements)
+    except (ValueError, TypeError):
+        return []
+
+    if (_ln := len(_elements)) > 1:
+        # Очереди для создания списка индексов.
+        query_buff: deque = deque()
+        query_work: deque = deque()
+        # Инициализируем буфферную очередь исходным списком, деленным пополам
+        query_buff.append(MergeRanges(0, (_ln // 2), _ln))
+        # Далее делим пополам обе половины до тех пор, пока в каждой половине не останетса по одному элементу
+        while query_buff:
+            i_first, i_middle, i_last = query_buff.popleft()
+            # Делим пополам левую часть
+            if (_md := (i_middle - i_first) // 2) > 0:
+                query_buff.append(MergeRanges(i_first, (i_first + _md), i_middle))
+            # Делим пополам правую часть
+            if (_md := (i_last - i_middle) // 2) > 0:
+                query_buff.append(MergeRanges(i_middle, (i_middle + _md), i_last))
+            # Результирующая очередь будет содержать индексы диапазонов для каждой из половин
+            query_work.append(MergeRanges(i_first, i_middle, i_last))
+        # Сортируем все полученные половины и собираем из них результирующий отсортированный список
+        while query_work:
+            # Выбираем из очереди диапазоны начиная с меньших
+            i_first, i_middle, i_last = query_work.pop()
+            i_current: int = i_first
+            # Формируем списки с данными для каждой половины
+            left_list: tuple = tuple(_elements[i_first:i_middle])
+            right_list: tuple = tuple(_elements[i_middle:i_last])
+            i_left: int = 0
+            i_right: int = 0
+            # Поэлементно сравниваем половины и формируем результирующий список
+            while i_left < len(left_list) and i_right < len(right_list):
+                if (
+                    (left_list[i_left] > right_list[i_right])
+                    if revers  # Учитываем порядок сортировки
+                    else (right_list[i_right] > left_list[i_left])
+                ):
+                    _elements[i_current] = left_list[i_left]
+                    i_left += 1
+                else:
+                    _elements[i_current] = right_list[i_right]
+                    i_right += 1
+                i_current += 1
+            # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
+            match (i_left < len(left_list), i_right < len(right_list)):
+                case (True, False):
+                    _elements[i_current:i_last] = left_list[i_left:]
+                case (False, True):
+                    _elements[i_current:i_last] = right_list[i_right:]
+
+    return _elements
+
+
+# --------------------------------------------------------------------------------------------
 class SortMethod(str, Enum):
     SHELL = "Shell"
     HIBBARD = "Hibbard"
@@ -420,7 +502,7 @@ class SortMethod(str, Enum):
     FIBONACCI = "Fibonacci"
 
 
-class GetRangesSort:
+class GetRangesSort(Iterable):
     """
     Вспомогательный класс для функции sort_by_shell(). Реализует различные методы формирования
     диапазонов чисел для перестановки. Класс является итератором.
@@ -464,9 +546,8 @@ class GetRangesSort:
                     self.__calc_res.sort()
 
     def __iter__(self) -> Iterator[int]:  # позволяет итерировать класс
-        # Возвращаемый генератор поддерживает интерфейс итератора
         # Итерируем в обратном порядке от большего к меньшему
-        return (res for res in self.__calc_res[::-1])
+        return (iter(self.__calc_res[::-1]))
 
     # позволяет применять к классу срезы и вести себя как последовательность
     def __len__(self) -> int:
@@ -491,7 +572,7 @@ class GetRangesSort:
         else:
             return 8 * 2**i - 6 * 2 ** ((i + 1) // 2) + 1
 
-    def __get_fibonacci_gen(self, ln: int):
+    def __get_fibonacci_gen(self, ln: int) -> Iterator[int]:
         """
         Формирует отличную от классической последовательность: вместо [1,1,2,3,5...] получаем [1,2,3,5...]
         Дублирование первых двух единиц не требуется.
