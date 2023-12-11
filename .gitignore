@@ -137,5 +137,6 @@ pipfile.lock
 
 # Develop
 .flake8
+.flake8.bak
 .isort.cfg
 .pytest.ini

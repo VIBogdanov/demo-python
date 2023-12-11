@@ -38,7 +38,7 @@ class RangeIndex(NamedTuple):
 def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
     """
     Функция-генератор, формирующая список индексов диапазонов заданной длины,
-    на которые можно разбить исходноый список длиной list_len.
+    на которые можно разбить исходный список длиной list_len.
 
     Args:
         list_len (int): Длина исходного списка.
@@ -61,7 +61,11 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
         yield RangeIndex(0, _list_len)
     else:
         for i in range(0, _list_len, _range_len):
-            yield RangeIndex(i, i + _range_len) if (i + _range_len) < _list_len else RangeIndex(i, _list_len)
+            yield (
+                RangeIndex(i, i + _range_len)
+                if (i + _range_len) < _list_len
+                else RangeIndex(i, _list_len)
+            )
 
 
 def _is_srt(args: tuple[Iterator, bool]) -> bool:
@@ -148,7 +152,7 @@ def is_sorted(
             # Загружаем задачи в пул и запускаем итератор для получения результатов по мере готовности
             for result in mpool.imap_unordered(_is_srt, margs_list):
                 # Если один из результатов False, останавливаем цикл получения результатов
-                if result is False:
+                if not result:
                     # Отменяем выполнение задач, которые еще не загружены в пул
                     mpool.terminate()
                     break  # Прерывает цикл (for) проверки результатов
@@ -159,7 +163,9 @@ def is_sorted(
         return _is_srt((iter(elements), revers))
 
 
-def get_number_permutations(source_list: Iterable[TAny], target_list: Iterable[TAny]) -> int:
+def get_number_permutations(
+    source_list: Iterable[TAny], target_list: Iterable[TAny]
+) -> int:
     """
     Подсчитывает минимальное количество перестановок, которое необходимо произвести для того,
     чтобы из исходного списка source_list получить целевой список target_list. При этом порядок
@@ -178,7 +184,7 @@ def get_number_permutations(source_list: Iterable[TAny], target_list: Iterable[T
         int: Минимальное количество перестановок
     """
     # формируем список из номеров позиций для каждого значения из целевого списка.
-    # Само значения является ключем.
+    # Само значение является ключом.
     target_index: dict[TAny, int] = {n: i for i, n in enumerate(target_list)}
     # Генератор, который формирует номер позиции, на которую нужно переставить значение из исходного списка.
     source_index_generator = (target_index[source_item] for source_item in source_list)
@@ -199,7 +205,7 @@ def get_number_permutations(source_list: Iterable[TAny], target_list: Iterable[T
 if __name__ == "__main__":
     from time import time
 
-    data = range(10_000_000)
+    data = range(100_000_000)
     start = time()
     res = is_sorted(data)
     print(f"Общее время выполнения is_sorted({res}):", time() - start)
