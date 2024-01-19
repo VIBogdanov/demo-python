@@ -687,6 +687,7 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
     Args:
         elements (Iterable): Список данных для сортировки.
+
         revers (bool, optional): Если задано True, список сортируется по убыванию. Defaults to False.
 
     Returns:
@@ -769,7 +770,9 @@ def get_page_number(pages: int, count: int, digits: list[int]) -> int:
 
     Args:
         pages (int): Количество страниц в книге
+
         count (int): Количество страниц заканчивающихся на цифры из списка digits
+
         digits (list[int]): Список цифр, на которые должны заканчиваться искомые страницы
 
     Returns:
