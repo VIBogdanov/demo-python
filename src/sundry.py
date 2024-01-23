@@ -392,7 +392,7 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
                     )
                 # Список пока не отсортирован, т.к. потребовались перестановки
                 is_swapped = True
-                
+
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
         if is_swapped:
@@ -465,7 +465,6 @@ class MergeRanges(NamedTuple):
     """
     Вспомогательный именованный кортеж для функции sort_by_merge2()
     """
-
     first_index: int
     middle_index: int
     last_index: int
@@ -652,7 +651,7 @@ def sort_by_shell(
     Args:
         elements (Iterable): Список данных для сортировки
 
-        revers (bool, optional): Если задано True, то сортировка по убыванию.. Defaults to False.
+        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
 
         method (SortMethod, optional): Метод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth,
         Fibonacci. Defaults to "Shell".
@@ -718,6 +717,9 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
         i_min: int = i_start
         i_max: int = i_end
 
+        # Флаг, исключающий "пустые" циклы, когда список достигает состояния "отсортирован" на одной из итераций
+        is_swapped = False
+
         # Перебираем диапазоны, сокращая длину каждого следующего диапазона на 2
         while i_start < i_end:
             # Т.к. до последнего элемента не доходим, необходимо перед итерацией
@@ -734,36 +736,54 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
                     _elements[i_start],
                 )
             for i_current in range(i_start, i_end, 1):
+                _current_element = _elements[i_current]
                 # Если текущий элемент больше последнего в диапазоне, то это потенциальный максимум
                 # для текущего диапазона.
                 if (
-                    (_elements[i_max] > _elements[i_current])
+                    (_elements[i_max] > _current_element)
                     if revers
-                    else (_elements[i_current] > _elements[i_max])
+                    else (_current_element > _elements[i_max])
                 ):
                     i_max = i_current
                 # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
                 elif (i_current > i_start) and (
-                    (_elements[i_min] < _elements[i_current])
+                    (_elements[i_min] < _current_element)
                     if revers
-                    else (_elements[i_current] < _elements[i_min])
+                    else (_current_element < _elements[i_min])
                 ):
                     i_min = i_current
+                elif (
+                    (_elements[i_current + 1] > _current_element)
+                    if revers
+                    else (_current_element > _elements[i_current + 1])
+                    ):
+                        # Требуется перестановка на следующей итерации
+                        is_swapped = True
+
             # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
             # с начальным и/или конечным элементом текущего диапазона.
             if i_max != i_end:
                 _elements[i_end], _elements[i_max] = _elements[i_max], _elements[i_end]
+                is_swapped = True
+
             if i_min != i_start:
                 _elements[i_start], _elements[i_min] = (
                     _elements[i_min],
                     _elements[i_start],
                 )
+                is_swapped = True
+
             # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
             # т.к. на предыдущей итерации найдены одновременно минимум и максимум
-            i_start += 1
-            i_end -= 1
-            i_min = i_start
-            i_max = i_end
+            if is_swapped:
+                i_start += 1
+                i_end -= 1
+                i_min = i_start
+                i_max = i_end
+                is_swapped = False
+            else:
+                # Если за итерацию перестановок не потребовалось, то список уже отсортирован. Выходим из цикла
+               i_start, i_end = 0, 0
 
     return _elements
 
