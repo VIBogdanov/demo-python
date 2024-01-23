@@ -365,6 +365,9 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     i_start: int = 0
     i_end: int = len(_elements) - 1
 
+    # Флаг, исключающий "пустые" циклы, когда список достигает состояния "отсортирован" на одной из итераций
+    is_swapped = False
+
     while i_start < i_end:
         for i_current in range(i_start, i_end, 1):
             # Если текущий элемент больше следующего, то переставляем их местами. Это потенциальный максимум.
@@ -387,10 +390,18 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
                         _elements[i_current],
                         _elements[i_start],
                     )
+                # Список пока не отсортирован, т.к. потребовались перестановки
+                is_swapped = True
+                
         # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
         # т.к. на предыдущей итерации найдены одновременно минимум и максимум
-        i_start += 1
-        i_end -= 1
+        if is_swapped:
+            i_start += 1
+            i_end -= 1
+            is_swapped = False
+        else:
+            # Если за итерацию перестановок не было, то список уже отсортирован. Выходим из цикла
+            i_start, i_end = 0, 0
 
     return _elements
 
