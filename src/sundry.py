@@ -465,6 +465,7 @@ class MergeRanges(NamedTuple):
     """
     Вспомогательный именованный кортеж для функции sort_by_merge2()
     """
+
     first_index: int
     middle_index: int
     last_index: int
@@ -756,9 +757,9 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
                     (_elements[i_current + 1] > _current_element)
                     if revers
                     else (_current_element > _elements[i_current + 1])
-                    ):
-                        # Требуется перестановка на следующей итерации
-                        is_swapped = True
+                ):
+                    # Требуется перестановка на следующей итерации
+                    is_swapped = True
 
             # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
             # с начальным и/или конечным элементом текущего диапазона.
@@ -783,50 +784,46 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
                 is_swapped = False
             else:
                 # Если за итерацию перестановок не потребовалось, то список уже отсортирован. Выходим из цикла
-               i_start, i_end = 0, 0
+                i_start, i_end = 0, 0
 
     return _elements
 
 
 # -------------------------------------------------------------------------------------------------
-def get_page_number(pages: int, count: int, digits: list[int]) -> int:
-    """Задача из олимпиады. Необходимо определить наибольший номер страницы X книги,
-      с которой нужно начать читать книгу, чтобы ровно 'count' номеров страниц, начиная
-      со страницы X и до последней страницей 'pages', заканчивались на цифры из списка  'digits'.
+def get_common_divisor(number_a: int, number_b: int) -> int:
+    """
+    Алгоритм нахождения наибольшего общего делителя двух целых чисел.
+    Используется метод Евклида. Например, для чисел 20 и 12:
+    - 20 % 12 = 8
+    - 12 % 8 = 4
+    - 8 % 4 = 0
 
-      Например:
-      - вызов get_page_number(1000000000000, 1234, [5,6]) вернет 999999993835
-      - вызов get_page_number(27, 3, [8,0]) вернет 18
-      - вызов get_page_number(20, 5, [4,7]) вернет 0
+    Искомый делитель равен 4
+
+    Порядок следования входных значений не важен. Допускаются как положительные, так и отрицательные
+    входные значения чисел в различных комбинациях. Возможны комбинации нулевых входных значений.
 
     Args:
-        pages (int): Количество страниц в книге
+        number_a (int): Первое число
 
-        count (int): Количество страниц заканчивающихся на цифры из списка digits
-
-        digits (list[int]): Список цифр, на которые должны заканчиваться искомые страницы
+        number_b (int): Второе число
 
     Returns:
-        int: Номер искомой страницы или 0 в случае безуспешного поиска
+        int: Наибольший общий делитель. Как минимум 1 является общим делителем для всех чисел.
     """
-    result: int = -1
-    if (count > 0) and (pages >= count) and (len_ld := len(digits)) > 0:
-        last_digits: list[int] = digits.copy()
-        # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
-        for i in range(len_ld):
-            pn: int = (pages - last_digits[i]) // 10 * 10 + last_digits[i]
-            last_digits[i] = pn
+    # Определяем делимое и делитель. Делимое - большее число. Делитель - меньшее.
+    divisible = max(abs(number_a), abs(number_b))
+    divisor = min(abs(number_a), abs(number_b))
 
-        # Полученный список обязательно должен быть отсортирован в обратном порядке
-        last_digits.sort(reverse=True)
-        # Вычисляем позицию числа, которое соответствует смещению count
-        idx: int = (count % len_ld) - 1
-        # Т.к. последующая последняя цифра повторяется через 10,
-        # вычисляем множитель с учетом уже вычисленных значений
-        multiplier: int = abs((count - 1) // len_ld)
-        result = last_digits[idx] - (multiplier * 10)
+    # Делить на ноль нельзя. Если делитель равен 0, меняем местами делимое с делитлем.
+    if divisor == 0:
+        divisible, divisor = divisor, divisible
 
-    return result if result > 0 else 0
+    # Ищем общий делитель как остаток от деления, при котором на следующей итерации остаток от деления равен 0.
+    while divisor != 0:
+        divisible, divisor = divisor, divisible % divisor
+
+    return divisible
 
 
 if __name__ == "__main__":
