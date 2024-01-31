@@ -7,6 +7,21 @@ TAny = TypeVar("TAny")
 NumberStrNone: TypeAlias = int | float | str | None
 
 
+def is_even(n: int) -> bool:
+    """
+    Крайне простой алгоритм проверки целого числа на четность.
+    У четных целых первый бит всегда равен 0.
+    Не требуется получение остатка делением на два: n % 2
+
+    Args:
+        n (int): Целое число. Допускается положительные и отрицательные числа.
+
+    Returns:
+        bool: True - если число четное.
+    """
+    return not n & 1
+
+
 def get_positive_int(value: NumberStrNone) -> int:
     """
     Проверяет значение на положительное целое.
