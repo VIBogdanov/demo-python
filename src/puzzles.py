@@ -171,9 +171,9 @@ def get_pagebook_number(pages: int, count: int, digits: list[int]) -> int:
       со страницы X и до последней страницей 'pages', заканчивались на цифры из списка  'digits'.
 
       Например:
-      - вызов get_page_number(1000000000000, 1234, [5,6]) вернет 999999993835
-      - вызов get_page_number(27, 3, [8,0]) вернет 18
-      - вызов get_page_number(20, 5, [4,7]) вернет 0
+      - вызов get_pagebook_number(1000000000000, 1234, [5,6]) вернет 999999993835
+      - вызов get_pagebook_number(27, 2, [8,0]) вернет 18
+      - вызов get_pagebook_number(20, 5, [4,7]) вернет 0
 
     Args:
         pages (int): Количество страниц в книге
@@ -186,8 +186,10 @@ def get_pagebook_number(pages: int, count: int, digits: list[int]) -> int:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
     result: int = -1
-    if (count > 0) and (pages >= count) and (len_lastdig := len(digits)) > 0:
-        last_digits: list[int] = digits.copy()
+    if (count > 0) and (pages >= count) and (len(digits)) > 0:
+        # Создаем копию и попутно удаляем дубликаты
+        last_digits: list[int] = list(set(digits))
+        len_lastdig = len(last_digits)
         # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
         for i in range(len_lastdig):
             page_numn: int = (pages - last_digits[i]) // 10 * 10 + last_digits[i]
