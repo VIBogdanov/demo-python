@@ -815,12 +815,8 @@ def get_common_divisor(number_a: int, number_b: int) -> int:
     divisible = max(abs(number_a), abs(number_b))
     divisor = min(abs(number_a), abs(number_b))
 
-    # Делить на ноль нельзя. Если делитель равен 0, меняем местами делимое с делитлем.
-    if divisor == 0:
-        divisible, divisor = divisor, divisible
-
     # Ищем общий делитель как остаток от деления, при котором на следующей итерации остаток от деления равен 0.
-    while divisor != 0:
+    while divisor:
         divisible, divisor = divisor, divisible % divisor
 
     return divisible
