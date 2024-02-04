@@ -136,6 +136,7 @@ def find_nearest_number(
         return result
 
 
+# -------------------------------------------------------------------------------
 def _do_find_nearest(
     digits_list: Iterable[int],
     current_index: int,
@@ -633,6 +634,7 @@ class GetRangesSort(Iterable):
             curr, prev = (prev + curr), curr
 
 
+# --------------------------------------------------------------------------------------------
 def sort_by_shell(
     elements: Iterable[T],
     *,
@@ -812,8 +814,8 @@ def get_common_divisor(number_a: int, number_b: int) -> int:
         int: Наибольший общий делитель. Как минимум 1 является общим делителем для всех чисел.
     """
     # Определяем делимое и делитель. Делимое - большее число. Делитель - меньшее.
-    divisible = max(abs(number_a), abs(number_b))
-    divisor = min(abs(number_a), abs(number_b))
+    divisible: int = max(abs(number_a), abs(number_b))
+    divisor: int = min(abs(number_a), abs(number_b))
 
     # Ищем общий делитель как остаток от деления, при котором на следующей итерации остаток от деления равен 0.
     while divisor:

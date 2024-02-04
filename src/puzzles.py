@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict, deque
-from collections.abc import Iterable
+from collections.abc import Collection, Generator, Iterable
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
@@ -165,7 +165,7 @@ def count_items(
 
 
 # -------------------------------------------------------------------------------------------------
-def get_pagebook_number(pages: int, count: int, digits: list[int]) -> int:
+def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     """Олимпиадная задача. Необходимо определить наибольший номер страницы X книги,
       с которой нужно начать читать книгу, чтобы ровно 'count' номеров страниц, начиная
       со страницы X и до последней страницей 'pages', заканчивались на цифры из списка  'digits'.
@@ -180,16 +180,22 @@ def get_pagebook_number(pages: int, count: int, digits: list[int]) -> int:
 
         count (int): Количество страниц заканчивающихся на цифры из списка digits
 
-        digits (list[int]): Список цифр, на которые должны заканчиваться искомые страницы
+        digits (Iterable[int]): Список цифр, на которые должны заканчиваться искомые страницы
 
     Returns:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
-    result: int = -1
-    if (count > 0) and (pages >= count) and (len(digits)) > 0:
-        # Создаем копию и попутно удаляем дубликаты
+
+    # Создаем копию и попутно удаляем дубликаты
+    try:
         last_digits: list[int] = list(set(digits))
-        len_lastdig = len(last_digits)
+    except (ValueError, TypeError):
+        return 0
+
+    len_lastdig: int = len(last_digits)
+    result: int = -1
+
+    if (count > 0) and (pages >= count) and (len_lastdig) > 0:
         # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
         for i in range(len_lastdig):
             page_numn: int = (pages - last_digits[i]) // 10 * 10 + last_digits[i]
@@ -208,7 +214,7 @@ def get_pagebook_number(pages: int, count: int, digits: list[int]) -> int:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_combination_numbers(digits: list[int]) -> list[int]:
+def get_combination_numbers(digits: Collection[int]) -> list[tuple[int, ...]]:
     """
     Сформировать все возможные уникальные наборы чисел, сформированных из указанных цифр.
     Цифры можно использовать не более одного раза в каждой комбинации.
@@ -226,12 +232,12 @@ def get_combination_numbers(digits: list[int]) -> list[int]:
         # Список двух-, трех-  т.д. значных цифр, составленных из цифр исходного списка
         Numbers_List: list[int]
         # Оставшиеся от исходного списка цифры после формирования списка чисел
-        Digits_List: list[int]
+        Digits_List: Collection[int]
 
     # Результирующий список как множество, дабы исключить дубликаты
     results = set()
-    # Предварительно обрабатываем каждое отдельное значение исходного списка
-    # В результирующий список сохраняем все комбинации из цифр исходного списка и удаляем дубли
+    # Предварительно в результирующий список сохраняем все комбинации из цифр
+    # исходного списка (состоящие из одной цифры) и удаляем дубли
     results = set(permutations(digits))
 
     # Очередь потребуется для хранения списков, требующих обработки
@@ -244,7 +250,7 @@ def get_combination_numbers(digits: list[int]) -> list[int]:
         combo_numbers: ComboNums = query_buff.pop()
         # Формируем генератор, который из цифр списка составляет двухзначные, трехзначные и т.д. числа
         # Т.к. числа, состоящие из одной цифры, уже обработаны, начинаем с двухзначных чисел
-        gen_digits_list = (
+        gen_digits_list: Generator[tuple[int, ...], None, None] = (
             digit
             for perms in (
                 set(permutations(combo_numbers.Digits_List, i))
@@ -254,14 +260,14 @@ def get_combination_numbers(digits: list[int]) -> list[int]:
             if digit[0] != 0  # Исключаем числа начинающиеся с нуля
         )
         # Перебираем все полученные двухзначные, трехзначные и т.д. числа
-        for digits_list in gen_digits_list:
+        for selected_digits in gen_digits_list:
             # Удаляем из списка цифры, из которых состоят двухзначных, трехзначных и т.д. числа.
             # Например, для числа 12 из исходного списка удаляем цифры 1 и 2
             digits_count = Counter(combo_numbers.Digits_List)
-            digits_count.subtract(digits_list)
+            digits_count.subtract(selected_digits)
             # Из отобранных цифр (в нашем примере 1 и 2) формируем число 12
-            num = reduce(
-                lambda dig_prev, dig_next: 10 * dig_prev + dig_next, digits_list
+            num: int = reduce(
+                lambda dig_prev, dig_next: 10 * dig_prev + dig_next, selected_digits
             )
             # В результирующий список записываем все возможные комбинации числа 12 и оставшихся цифр
             results.update(
@@ -274,7 +280,7 @@ def get_combination_numbers(digits: list[int]) -> list[int]:
                 )
             )
             # Если количество оставшихся цифр в списке 2 и более, то есть возможность
-            # сформировать комбинации из трехзначных и более чисел и оставшихся цифр.
+            # сформировать комбинации из трехзначных и более чисел из оставшихся цифр.
             if digits_count.total() > 1:
                 query_buff.append(
                     ComboNums(
