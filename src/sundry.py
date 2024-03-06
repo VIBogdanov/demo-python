@@ -1,19 +1,18 @@
 from collections import defaultdict, deque
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Collection, Iterable, Iterator
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
 T = TypeVar("T")
-NumberValue: TypeAlias = int | float | str
+TNumber: TypeAlias = int | float | str
 
 
 # ------------------------------------------------------------------------------
 def find_intervals(
     elements: Iterable[int],
-    *,
-    target: int = 0,
+    target: int,
 ) -> list[tuple[int, int]]:
     """
     Поиск в списке из чисел последовательного непрерывного интервала(-ов) чисел,
@@ -35,11 +34,9 @@ def find_intervals(
         конечный индексы включительно. Если ни один диапазон не найден, возвращается пустой список.
 
     Example:
-        >>> find_intervals([1, -3, 4, 5], 9)
-        [(2, 3)]
+        >>> find_intervals([1, -3, 4, 5], 9) -> [(2, 3)]
 
-        >>> find_intervals([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 0)
-        [(0, 1), (4, 6), (8, 9), (9, 10)]
+        >>> find_intervals([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 0) -> [(0, 1), (4, 6), (8, 9), (9, 10)]
     """
     try:
         _target: int = int(target)
@@ -68,7 +65,7 @@ def find_intervals(
 
 # -------------------------------------------------------------------------------
 def find_nearest_number(
-    number: NumberValue,
+    number: TNumber,
     *,
     previous: bool = True,
 ) -> int | None:
@@ -88,14 +85,11 @@ def find_nearest_number(
         (int | None): Если поиск безуспешен, возвращается значение None.
 
     Example:
-        >>> find_nearest_number(273145)
-        271543
+        >>> find_nearest_number(273145) -> 271543
 
-        >>> find_nearest_number(273145, previous=False)
-        273154
+        >>> find_nearest_number(273145, previous=False) -> 273154
 
-        >>> find_nearest_number(-273145)
-        -273154
+        >>> find_nearest_number(-273145) -> -273154
 
     """
     # если входное значение невозможно представить как целое число, возвращаем None
@@ -104,9 +98,8 @@ def find_nearest_number(
     except (ValueError, TypeError):
         return None
     else:
-        result: int | None = (
-            None  # по-умолчанию, в случае безуспешного поиска, возвращаем None
-        )
+        # по-умолчанию, в случае безуспешного поиска, возвращаем None
+        result: int | None = None
         is_previous: bool = previous
         sign_number: int = 1
 
@@ -144,7 +137,7 @@ def _do_find_nearest(
 ) -> int | None:
     """
     Вспомогательная подпрограмма для функции find_nearest_number. Просматривает
-    цифры левее текущей позиции исходного числа с целью поиска большего или
+    цифры левее текущей цифры исходного числа с целью поиска большего или
     меньшего значения в зависимости от направления поиска. В случае успешного поиска,
     выполняет перестановку цифр и сортирует правую часть числа по возрастанию или
     убыванию в зависимости от направления поиска.
@@ -152,7 +145,7 @@ def _do_find_nearest(
     Args:
         digits_list (Iterable[int]): Массив цифр исходного числа
 
-        current_index (int): Текущая позиция исходного числа
+        current_index (int): Текущая позиция цифры, относительно которой выполняется перестановка
 
         previous (bool): Направление поиска: ближайшее большее или меньшее. True - меньшее, False - большее
 
@@ -188,7 +181,7 @@ def _do_find_nearest(
 
 # ------------------------------------------------------------------------------------
 def find_item_by_binary(
-    elements: Sequence[Any],
+    elements: Collection[Any],
     target: Any,
 ) -> int | None:
     """
@@ -222,13 +215,11 @@ def find_item_by_binary(
     # Стартуем с первого и последнего индекса массива одновременно
     i_first: int = 0
     i_last: int = len(elements) - 1
-
     i_target: int | None = None  # Возвращаемый индекс найденого значения
 
     while i_first <= i_last and i_target is None:
-        i_current: int = (
-            i_first + i_last
-        ) // 2  # Делим текущий остаток массива пополам
+        # Делим текущий остаток массива пополам
+        i_current: int = (i_first + i_last) // 2
         try:
             match (
                 elements[i_current],
@@ -259,7 +250,7 @@ def find_item_by_binary(
 
 # ---------------------------------------------find_item_by_interpolation---------------------------------------------
 def find_item_by_interpolation(
-    elements: Sequence[int | float],
+    elements: Collection[int | float],
     target: int | float,
 ) -> int | None:
     """
@@ -290,14 +281,15 @@ def find_item_by_interpolation(
             except (ValueError, TypeError):
                 return None
     # Определяем порядок сортировки исходного массива
-    sort_order: int = 1 if elements[-1] > elements[0] else -1
+    sort_order: int = 1 if elements[-1] >= elements[0] else -1
     # Стартуем с первого и последнего индекса массива одновременно
     i_first: int = 0
     i_end: int = len(elements) - 1
     i_target: int | None = None  # Возвращаемый индекс найденого значения
 
     while i_first <= i_end and i_target is None:
-        # Если искомый элемент вне проверяемого диапазона, выходим из цикла
+        # Если искомый элемент вне проверяемого диапазона, выходим
+        # Эта проверка необходима, чтобы избежать зацикливания при неотсортированном исходном списке
         if ((sort_order * target) < (sort_order * elements[i_first])) or (
             (sort_order * target) > (sort_order * elements[i_end])
         ):

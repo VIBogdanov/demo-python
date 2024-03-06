@@ -5,13 +5,11 @@ from itertools import chain, groupby, permutations
 from math import prod
 from typing import NamedTuple, TypeVar
 
-TAny = TypeVar("TAny")
+T = TypeVar("T")
 
 
 # --------------------------------------------------------------------------------
-def get_number_permutations(
-    source_list: Iterable[TAny], target_list: Iterable[TAny]
-) -> int:
+def get_number_permutations(source_list: Iterable[T], target_list: Iterable[T]) -> int:
     """
     Подсчитывает минимальное количество перестановок, которое необходимо произвести для того,
     чтобы из исходного списка source_list получить целевой список target_list. При этом порядок
@@ -22,18 +20,20 @@ def get_number_permutations(
     Требуется выполнить три перестановки для приведения списков в идентичное состояние.
 
     Args:
-        source_list (Iterable[TAny]): Исходный список
+        source_list (Iterable[T]): Исходный список
 
-        target_list (Iterable[TAny]): Целевой список
+        target_list (Iterable[T]): Целевой список
 
     Returns:
         int: Минимальное количество перестановок
     """
     # формируем список из номеров позиций для каждого значения из целевого списка.
     # Само значение является ключом.
-    target_index: dict[TAny, int] = {n: i for i, n in enumerate(target_list)}
+    target_index: dict[T, int] = {n: i for i, n in enumerate(target_list)}
     # Генератор, который формирует номер позиции, на которую нужно переставить значение из исходного списка.
-    source_index_generator = (target_index[source_item] for source_item in source_list)
+    source_index_generator: Generator[int, None, None] = (
+        target_index[source_item] for source_item in source_list
+    )
     count: int = 0
     # Получаем целевой номер позиции для первого значения из исходного списка
     prev_item = next(source_index_generator)
@@ -109,7 +109,7 @@ def mult_matrix(
 
 # --------------------------------------------------------------------------------
 def count_items(
-    data_list: list,
+    data_list: Iterable[T],
     target: str,
     operation: str = "Total",
 ) -> int | float | None:
