@@ -715,62 +715,53 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
         # Флаг, исключающий "пустые" циклы, когда список достигает состояния "отсортирован" на одной из итераций
         is_swapped = False
 
+        def _compare(revers: bool, prev, next) -> bool:
+            return prev < next if revers else next < prev
+
         # Перебираем диапазоны, сокращая длину каждого следующего диапазона на 2
         while i_start < i_end:
             # Т.к. до последнего элемента не доходим, необходимо перед итерацией
-            # сравнить последний элемент с первым. Возмоно последний элемент
+            # сравнить последний элемент с первым. Возможно последний элемент
             # потенциальный минимум текущего диапазона
-            if (
-                (_elements[i_end] > _elements[i_start])
-                if revers
-                else (_elements[i_start] > _elements[i_end])
-            ):
+            if _compare(revers, _elements[i_start], _elements[i_end]):
                 # Меняем местами первый и последний элементы текущего диапазона
                 _elements[i_start], _elements[i_end] = (
                     _elements[i_end],
                     _elements[i_start],
                 )
+
             for i_current in range(i_start, i_end, 1):
                 _current_element = _elements[i_current]
                 # Если текущий элемент больше последнего в диапазоне, то это потенциальный максимум
                 # для текущего диапазона.
-                if (
-                    (_elements[i_max] > _current_element)
-                    if revers
-                    else (_current_element > _elements[i_max])
-                ):
+                if _compare(revers, _current_element, _elements[i_max]):
                     i_max = i_current
-                # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
-                elif (i_current > i_start) and (
-                    (_elements[i_min] < _current_element)
-                    if revers
-                    else (_current_element < _elements[i_min])
-                ):
-                    i_min = i_current
-                elif (
-                    (_elements[i_current + 1] > _current_element)
-                    if revers
-                    else (_current_element > _elements[i_current + 1])
-                ):
-                    # Требуется перестановка на следующей итерации
                     is_swapped = True
-
-            # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
-            # с начальным и/или конечным элементом текущего диапазона.
-            if i_max != i_end:
-                _elements[i_end], _elements[i_max] = _elements[i_max], _elements[i_end]
-                is_swapped = True
-
-            if i_min != i_start:
-                _elements[i_start], _elements[i_min] = (
-                    _elements[i_min],
-                    _elements[i_start],
-                )
-                is_swapped = True
+                # Одновременно проверяем на потенциальный минимум, сравнивая с первым элементом текущего диапазона.
+                elif _compare(revers, _elements[i_min], _current_element):
+                    i_min = i_current
+                    is_swapped = True
+                # Выясняем требуется ли перестановка на следующей итерации
+                elif not is_swapped and _compare(
+                    revers, _current_element, _elements[i_current + 1]
+                ):
+                    is_swapped = True
 
             # После каждой итерации по элементам списка, сокращаем длину проверяемого диапазона на 2,
             # т.к. на предыдущей итерации найдены одновременно минимум и максимум
             if is_swapped:
+                # Если найдены потенциальные минимум и/или максимум, выполняем перестановки элементов
+                # с начальным и/или конечным элементом текущего диапазона.
+                if i_max != i_end:
+                    _elements[i_end], _elements[i_max] = (
+                        _elements[i_max],
+                        _elements[i_end],
+                    )
+                if i_min != i_start:
+                    _elements[i_start], _elements[i_min] = (
+                        _elements[i_min],
+                        _elements[i_start],
+                    )
                 i_start += 1
                 i_end -= 1
                 i_min = i_start

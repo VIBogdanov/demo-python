@@ -111,6 +111,7 @@ def mult_matrix(
 def count_items(
     data_list: Iterable[T],
     target: str,
+    *,
     operation: str = "Total",
 ) -> int | float | None:
     """
@@ -166,14 +167,15 @@ def count_items(
 
 # -------------------------------------------------------------------------------------------------
 def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
-    """Олимпиадная задача. Необходимо определить наибольший номер страницы X книги,
-      с которой нужно начать читать книгу, чтобы ровно 'count' номеров страниц, начиная
-      со страницы X и до последней страницей 'pages', заканчивались на цифры из списка  'digits'.
+    """
+    Олимпиадная задача. Необходимо определить наибольший номер страницы X книги,
+    с которой нужно начать читать книгу, чтобы ровно 'count' номеров страниц, начиная
+    со страницы X и до последней страницей 'pages', заканчивались на цифры из списка  'digits'.
 
-      Например:
-      - вызов get_pagebook_number(1000000000000, 1234, [5,6]) вернет 999999993835
-      - вызов get_pagebook_number(27, 2, [8,0]) вернет 18
-      - вызов get_pagebook_number(20, 5, [4,7]) вернет 0
+    Например:
+    - вызов get_pagebook_number(1000000000000, 1234, [5,6]) вернет 999999993835
+    - вызов get_pagebook_number(27, 2, [8,0]) вернет 18
+    - вызов get_pagebook_number(20, 5, [4,7]) вернет 0
 
     Args:
         pages (int): Количество страниц в книге
@@ -185,6 +187,9 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     Returns:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
+    len_lastdig: int = len(digits)
+    if (count <= 0) and (pages < count) and (len_lastdig) == 0:
+        return 0
 
     # Создаем копию и попутно удаляем дубликаты
     try:
@@ -192,25 +197,18 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     except (ValueError, TypeError):
         return 0
 
-    len_lastdig: int = len(last_digits)
-    result: int = -1
+    # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
+    for i in range(len_lastdig):
+        last_digits[i] = (pages - last_digits[i]) // 10 * 10 + last_digits[i]
 
-    if (count > 0) and (pages >= count) and (len_lastdig) > 0:
-        # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
-        for i in range(len_lastdig):
-            page_numn: int = (pages - last_digits[i]) // 10 * 10 + last_digits[i]
-            last_digits[i] = page_numn
-
-        # Полученный список обязательно должен быть отсортирован в обратном порядке
-        last_digits.sort(reverse=True)
-        # Вычисляем позицию числа, которое соответствует смещению count
-        idx: int = (count % len_lastdig) - 1
-        # Т.к. последующая последняя цифра повторяется через 10,
-        # вычисляем множитель с учетом уже вычисленных значений
-        multiplier: int = abs((count - 1) // len_lastdig)
-        result = last_digits[idx] - (multiplier * 10)
-
-    return result if result > 0 else 0
+    # Полученный список обязательно должен быть отсортирован в обратном порядке
+    last_digits.sort(reverse=True)
+    # Вычисляем позицию числа, которое соответствует смещению count
+    idx: int = (count % len_lastdig) - 1
+    # Т.к. последующая последняя цифра повторяется через 10,
+    # вычисляем множитель с учетом уже вычисленных значений
+    multiplier: int = (count - 1) // len_lastdig
+    return last_digits[idx] - (multiplier * 10)
 
 
 # -------------------------------------------------------------------------------------------------

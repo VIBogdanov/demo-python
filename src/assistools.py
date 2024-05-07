@@ -178,6 +178,45 @@ def is_sorted(
         return _is_srt((iter(elements), revers))
 
 
+# -------------------------------------------------------------------------------------------------
+def get_day_week_index(iday: int, imonth: int, iyear: int) -> int:
+    if m := abs(imonth) % 12:
+        imonth = m
+    else:
+        imonth = 12
+
+    iyear = abs(iyear)
+    # По древнеримскому календарю год начинается с марта.
+    # Январь и февраль относятся к прошлому году
+    if imonth == 1 or imonth == 2:
+        iyear -= 1
+        imonth += 10
+    else:
+        imonth -= 2
+
+    icentury: int = iyear // 100  # количество столетий
+    iyear -= icentury * 100  # год в столетии
+
+    # Original: (day + (13*month-1)/5 + year + year/4 + century/4 - 2*century + 777) % 7
+    return int(
+        (abs(iday) + (13 * imonth - 1) // 5 + (5 * iyear - 7 * icentury) // 4 + 777) % 7
+    )
+
+
+# -------------------------------------------------------------------------------------------------
+def get_day_week_name(iday: int, imonth: int, iyear: int) -> str:
+    dw: list[str] = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+    ]
+    return dw[get_day_week_index(iday, imonth, iyear)]
+
+
 if __name__ == "__main__":
     from time import time
 

@@ -1,5 +1,9 @@
 from assistools import get_ranges_index
-from puzzles import get_combination_numbers, get_number_permutations
+from puzzles import (
+    get_combination_numbers,
+    get_number_permutations,
+    get_pagebook_number,
+)
 from sundry import (
     find_intervals,
     find_item_by_binary,
@@ -64,7 +68,9 @@ if __name__ == "__main__":
     )
 
     print("\n- Сортировки методом Shell.")
-    print(f" sort_by_shell([2, 7, 3, 1, 4, 5]) -> {sort_by_shell([2, 7, 3, 1, 4, 5])}")
+    print(
+        f" sort_by_shell([2, 7, 3, 1, 4, 5]) -> {sort_by_shell([2, 7, 3, 1, 4, 5], method = 'Shell')}"
+    )
 
     print("\n- Сортировки методом выбора.")
     print(
@@ -79,7 +85,10 @@ if __name__ == "__main__":
     )
 
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
-    print(f" get_combination_numbers([2, 7]) -> {get_combination_numbers([2, 7])}")
+    print(f" get_combination_numbers([2, 7]) -> {get_combination_numbers([0, 2, 7])}")
+
+    print("\n- Олимпиадная задача. См. описание в puzzles.py.")
+    print(f" get_pagebook_number(27, 2, [8,0]) -> {get_pagebook_number(27, 2, [8,0])}")
 
     print("")
     pass
