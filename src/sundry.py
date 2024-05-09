@@ -5,6 +5,8 @@ from functools import reduce
 from itertools import accumulate
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
+from assistools import get_positive_int
+
 T = TypeVar("T")
 TNumber: TypeAlias = int | float | str
 
@@ -796,9 +798,15 @@ def get_common_divisor(number_a: int, number_b: int) -> int:
     Returns:
         int: Наибольший общий делитель. Как минимум 1 является общим делителем для всех чисел.
     """
+    # На всякий случай
+    number_a = get_positive_int(number_a)
+    number_b = get_positive_int(number_b)
     # Определяем делимое и делитель. Делимое - большее число. Делитель - меньшее.
-    divisible: int = max(abs(number_a), abs(number_b))
-    divisor: int = min(abs(number_a), abs(number_b))
+    divisible, divisor = (
+        (number_a, number_b)
+        if max(number_a, number_b) == number_a
+        else (number_b, number_a)
+    )
 
     # Ищем общий делитель как остаток от деления, при котором на следующей итерации остаток от деления равен 0.
     while divisor:

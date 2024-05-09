@@ -90,7 +90,7 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
     итерация прерывается.
 
     Args:
-        args (tuple[Iterable, bool]): Кортеж параметров - список для проверки и
+        args (tuple[Iterable, bool]): Кортеж параметров - итератор списока для проверки и
         направление сортировки
 
     Returns:
