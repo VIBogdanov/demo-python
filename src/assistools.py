@@ -217,6 +217,17 @@ def get_day_week_name(iday: int, imonth: int, iyear: int) -> str:
     return dw[get_day_week_index(iday, imonth, iyear)]
 
 
+# -------------------------------------------------------------------------------------------------
+def main():
+    print(
+        "\n- Формирует список индексов диапазонов, на которые можно разбить список заданной длины."
+    )
+    print(" get_ranges_index(50, 10) -> ", end="")
+    for res in get_ranges_index(50, 10):
+        print(tuple(res), end=" ")
+    print("")
+
+
 if __name__ == "__main__":
     from time import time
 
@@ -224,4 +235,5 @@ if __name__ == "__main__":
     start = time()
     res = is_sorted(data)
     print(f"Общее время выполнения is_sorted({res}):", time() - start)
-    pass
+
+    main()

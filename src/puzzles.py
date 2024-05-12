@@ -292,5 +292,21 @@ def get_combination_numbers(digits: Collection[int]) -> list[tuple[int, ...]]:
     return list_results
 
 
+# -------------------------------------------------------------------------------------------------
+def main():
+    print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
+    print(f" get_combination_numbers([2, 7]) -> {get_combination_numbers([0, 2, 7])}")
+
+    print(
+        "\n- Минимальное количество перестановок, которое необходимо произвести для выравнивания списков."
+    )
+    print(
+        f" get_number_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])) -> {get_number_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])}"
+    )
+
+    print("\n- Олимпиадная задача. См. описание в puzzles.py.")
+    print(f" get_pagebook_number(27, 2, [8,0]) -> {get_pagebook_number(27, 2, [8,0])}")
+
+
 if __name__ == "__main__":
-    pass
+    main()

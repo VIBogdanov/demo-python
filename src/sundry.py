@@ -9,6 +9,7 @@ from assistools import get_positive_int
 
 T = TypeVar("T")
 TNumber: TypeAlias = int | float | str
+TInt: TypeAlias = int | str
 
 
 # ------------------------------------------------------------------------------
@@ -777,7 +778,7 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
 
 # -------------------------------------------------------------------------------------------------
-def get_common_divisor(number_a: int, number_b: int) -> int:
+def get_common_divisor(number_a: TInt, number_b: TInt) -> int:
     """
     Алгоритм нахождения наибольшего общего делителя двух целых чисел без перебора.
     Используется метод Евклида. Например, для чисел 20 и 12:
@@ -815,5 +816,59 @@ def get_common_divisor(number_a: int, number_b: int) -> int:
     return divisible
 
 
+# --------------------------------------------------------------------------------------------
+def main():
+    print(
+        "\n- Функция нахождения наибольшего общего делителя двух целых чисел без перебора методом Евклида."
+    )
+    print(f" get_common_divisor(20, 12) -> {get_common_divisor(20, 12)}")
+
+    print("\n- Поиск элемента в массиве данных при помощи бинарного алгоритма.")
+    print(
+        f" find_item_by_binary([-20, 30, 40, 50], 30) -> {find_item_by_binary([-20, 30, 40, 50], 30)}"
+    )
+
+    print("\n- Поиск элемента в массиве данных при помощи алгоритма интерполяции.")
+    print(
+        f" find_item_by_interpolation([-1, -2, 3, 4, 5], 4) -> {find_item_by_interpolation([-1, -2, 3, 4, 5], 4)}"
+    )
+
+    print(
+        "\n- Поиск в списке из чисел последовательного непрерывного интервала(-ов) чисел, сумма которых равна искомому значению."
+    )
+    print(" find_intervals([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 0) -> ", end="")
+    for res in find_intervals([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], 0):
+        print(tuple(res), end=" ")
+    print("")
+
+    print(
+        "\n- Поиск ближайшего целого числа, которое меньше или больше заданного и состоит из тех же цифр."
+    )
+    print(f" find_nearest_number(273145) -> {find_nearest_number(273145)}")
+
+    print("\n- Сортировки методом пузырька.")
+    print(
+        f" sort_by_bubble([2, 7, 3, 1, 4, 5]) -> {sort_by_bubble([2, 7, 3, 1, 4, 5])}"
+    )
+
+    print("\n- Сортировки методом слияния.")
+    print(f" sort_by_merge([2, 7, 3, 1, 4, 5]) -> {sort_by_merge([2, 7, 3, 1, 4, 5])}")
+
+    print("\n- Усовершенствованная версия сортировки методом слияния.")
+    print(
+        f" sort_by_merge2([2, 7, 3, 1, 4, 5]) -> {sort_by_merge2([2, 7, 3, 1, 4, 5])}"
+    )
+
+    print("\n- Сортировки методом Shell.")
+    print(
+        f" sort_by_shell([2, 7, 3, 1, 4, 5]) -> {sort_by_shell([2, 7, 3, 1, 4, 5], method = 'Shell')}"
+    )
+
+    print("\n- Сортировки методом выбора.")
+    print(
+        f" sort_by_selection([2, 7, 3, 1, 4, 5]) -> {sort_by_selection([2, 7, 3, 1, 4, 5])}"
+    )
+
+
 if __name__ == "__main__":
-    pass
+    main()
