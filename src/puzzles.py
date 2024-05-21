@@ -293,6 +293,66 @@ def get_combination_numbers(digits: Collection[int]) -> list[tuple[int, ...]]:
 
 
 # -------------------------------------------------------------------------------------------------
+def closest_amount(
+    numbers: Iterable[int], target: int
+) -> tuple[int, list[tuple[int, ...]]]:
+    """
+    Получить число, максимально близкое к числу X, из суммы неотрицательных чисел массива,
+    при условии, что числа из массива могут повторяться.
+
+    Args:
+        numbers: Массив чисел
+
+        target: Целевое число
+
+    Returns:
+        tuple[int, list]: Кортеж из искомого числа и списка(-ов) наборов чисел,
+        сумма которых равна искомому числу.
+    """
+    # Искомое число и списки чисел, суммы которых равны искомому числу
+    max_sum: int = 0
+    # Используем set, дабы исключить дубли
+    max_sum_numbers: set[tuple[int, ...]] = set()
+
+    # Очередь из промежуточных накопительных сумм и списков чисел, из которых состоят эти суммы
+    query_buff: deque[tuple[int, list[int]]] = deque()
+    # Стартуем с нуля
+    query_buff.append((0, []))
+
+    while query_buff:
+        # Вынимаем из очереди очередную промежуточную сумму
+        # и поочередно суммируем ее с числаси из входного массива.
+        current_sum, current_numbers = query_buff.popleft()
+        # Для перебора чисел из входного массива используем генератор, который отфильтровывает
+        # отрицательные числа и превышение целевого числа. Генератор формирует кортеж из
+        # следующей суммы и набора чисел, ее составляющих.
+        for next_sum, next_numbers in (
+            (
+                (current_sum + number),
+                # Сортировка позволяет избежать дублирование списков
+                sorted(current_numbers + [number]),
+            )
+            for number in numbers
+            if (lambda _number: (current_sum + _number) <= target and _number > 0)(
+                number
+            )
+        ):
+            # Если очередная полученная сумма больше ранее вычисленной максимальной суммы,
+            # обновляем максимальную сумму и список чисел, которые ее формируют.
+            if next_sum > max_sum:
+                max_sum = next_sum
+                max_sum_numbers.clear()
+                max_sum_numbers.add(tuple(next_numbers))
+            # Одна и та же сумма, может быть получена различными комбинациями чисел из входного массива.
+            elif next_sum == max_sum:
+                max_sum_numbers.add(tuple(next_numbers))
+            # Добавляем в очередь очередную сумму со списком чисел для дальнейшей обработки.
+            query_buff.append((next_sum, next_numbers))
+
+    return (max_sum, list(tuple(max_sum_numbers)))
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
     print(f" get_combination_numbers([2, 7]) -> {get_combination_numbers([0, 2, 7])}")
@@ -306,6 +366,9 @@ def main():
 
     print("\n- Олимпиадная задача. См. описание в puzzles.py.")
     print(f" get_pagebook_number(27, 2, [8,0]) -> {get_pagebook_number(27, 2, [8,0])}")
+
+    print("\n- Получить число, максимально близкое к числу X, из суммы чисел массива.")
+    print(f" closest_amount([20, 30, 38], 112) -> {closest_amount([20, 30, 38], 112)}")
 
 
 if __name__ == "__main__":
