@@ -1,6 +1,7 @@
-from collections.abc import Iterator, Sequence
+from collections import Counter
+from collections.abc import Iterable, Iterator, Sequence
 from multiprocessing import Pool, cpu_count
-from typing import NamedTuple, TypeAlias, TypeVar
+from typing import Any, NamedTuple, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 TAny = TypeVar("TAny")
@@ -218,6 +219,25 @@ def get_day_week_name(iday: int, imonth: int, iyear: int) -> str:
 
 
 # -------------------------------------------------------------------------------------------------
+def is_includes_elements(data: Iterable[Any], pattern: Iterable[Any]) -> bool:
+    """
+    Проверяет вхождение одного набора данных в другой. Сортировка не требуется, порядок не важен,
+    дублирование элементов допускается, относительный размер списков не принципиален.
+
+    Args:
+        data: Список, с которым сравнивается pattern.
+
+        pattern: Проверяемый список на вхождение в data.
+
+    Returns:
+        bool: True - если все элементы из pattern присутствуют в data в не меньшем количестве.
+    """
+    cdata = Counter(data)
+    cdata.subtract(Counter(pattern))
+    return len(-cdata) == 0
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print(
         "\n- Формирует список индексов диапазонов, на которые можно разбить список заданной длины."
@@ -225,7 +245,11 @@ def main():
     print(" get_ranges_index(50, 10) -> ", end="")
     for res in get_ranges_index(50, 10):
         print(tuple(res), end=" ")
-    print("")
+
+    print("\n\n- Проверяет вхождение одного набора данных в другой.")
+    print(
+        f" is_includes_elements([1, 2, 3, 4, 5, 6, 7, 8, 8], [1, 2, 4, 8]) -> {is_includes_elements([1, 2, 3, 4, 5, 6, 7, 8, 8], [1, 2, 4, 8])}"
+    )
 
 
 if __name__ == "__main__":

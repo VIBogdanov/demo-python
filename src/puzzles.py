@@ -321,7 +321,7 @@ def closest_amount(
 
     while query_buff:
         # Вынимаем из очереди очередную промежуточную сумму
-        # и поочередно суммируем ее с числаси из входного массива.
+        # и поочередно суммируем ее с числами из входного массива.
         current_sum, current_numbers = query_buff.popleft()
         # Для перебора чисел из входного массива используем генератор, который отфильтровывает
         # отрицательные числа и превышение целевого числа. Генератор формирует кортеж из
@@ -333,7 +333,7 @@ def closest_amount(
                 sorted(current_numbers + [number]),
             )
             for number in numbers
-            if (lambda _number: (current_sum + _number) <= target and _number > 0)(
+            if (lambda _number: _number > 0 and (current_sum + _number) <= target)(
                 number
             )
         ):
