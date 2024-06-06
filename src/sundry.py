@@ -188,10 +188,11 @@ def find_item_by_binary(
     target: Any,
 ) -> int | None:
     """
-    Функция поиска заданного значения в одномерном массиве. В качестве алгоритма поиска используется,
-    так называемый, алгоритм бинарного поиска. Суть алгоритма: на каждой итерации сравнивать срединный
-    элемент массива с искомым значением. Далее выяснить в какой из половинок массива находится искомое
-    значение и выбрать эту половину для дальнейшего деления, пока не будет найдено совпадение.
+    Функция поиска заданного значения в одномерном массиве. В качестве алгоритма поиска
+    используется, так называемый, алгоритм бинарного поиска. Суть алгоритма: на каждой
+    итерации сравнивать срединный элемент массива с искомым значением. Далее выяснить
+    в какой из половинок массива находится искомое значение и выбрать эту половину
+    для дальнейшего деления, пока не будет найдено совпадение.
 
     Внимание!!! Входной массив данных обязательно должен быть отсортирован. Функция учитывает
     направление сортировки - по возрастанию или убыванию.
@@ -472,7 +473,7 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     Усовершенствованная версия функции сортировки методом слияния (см. sort_by_merge). В отличии
     от оригинальной версии не использует рекурсивные вызовы и не создает каскад списков.
     Вместо этого создается список индексов для диапазонов сортировки, по которым происходит отбор
-    значений из списка источника и их сортировка.
+    значений из списка источника и их сортировка по месту.
 
     Args:
         elements (Iterable[T]): Список данных для сортировки.
@@ -510,30 +511,27 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
             # Выбираем из очереди диапазоны начиная с меньших
             i_first, i_middle, i_last = query_work.pop()
             i_current: int = i_first
-            # Формируем списки с данными для каждой половины
+            # Формируем список с данными для левой половины. Правую используем из самого сортируемого списка.
             left_list: tuple = tuple(_elements[i_first:i_middle])
-            right_list: tuple = tuple(_elements[i_middle:i_last])
+            # Инициализируем индексы. Левый по отдельному списку. Правый по сортируемому.
             i_left: int = 0
-            i_right: int = 0
+            i_right: int = i_middle
             # Поэлементно сравниваем половины и формируем результирующий список
-            while i_left < len(left_list) and i_right < len(right_list):
+            while i_left < len(left_list) and i_right < i_last:
                 if (
-                    (left_list[i_left] > right_list[i_right])
+                    (left_list[i_left] > _elements[i_right])
                     if revers  # Учитываем порядок сортировки
-                    else (right_list[i_right] > left_list[i_left])
+                    else (left_list[i_left] < _elements[i_right])
                 ):
                     _elements[i_current] = left_list[i_left]
                     i_left += 1
                 else:
-                    _elements[i_current] = right_list[i_right]
+                    _elements[i_current] = _elements[i_right]
                     i_right += 1
                 i_current += 1
-            # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
-            match (i_left < len(left_list), i_right < len(right_list)):
-                case (True, False):
-                    _elements[i_current:i_last] = left_list[i_left:]
-                case (False, True):
-                    _elements[i_current:i_last] = right_list[i_right:]
+            # Добавляем в результирующий список "хвост" от левой половины. Правая уже в списке.
+            if i_left < len(left_list):
+                _elements[i_current:i_last] = left_list[i_left:]
 
     return _elements
 
