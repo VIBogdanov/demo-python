@@ -458,22 +458,12 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
 
 # --------------------------------------------------------------------------------------------
-class MergeRanges(NamedTuple):
-    """
-    Вспомогательный именованный кортеж для функции sort_by_merge2()
-    """
-
-    first_index: int
-    middle_index: int
-    last_index: int
-
-
 def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     """
     Усовершенствованная версия функции сортировки методом слияния (см. sort_by_merge). В отличии
     от оригинальной версии не использует рекурсивные вызовы и не создает каскад списков.
     Вместо этого создается список индексов для диапазонов сортировки, по которым происходит отбор
-    значений из списка источника и их сортировка по месту.
+    значений из списка источника и сортировка по месту.
 
     Args:
         elements (Iterable[T]): Список данных для сортировки.
@@ -483,6 +473,13 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     Returns:
         list[T]: Результирующий отсортированный список.
     """
+
+    # Вспомогательный именованный кортеж
+    class MergeRanges(NamedTuple):
+        first_index: int
+        middle_index: int
+        last_index: int
+
     # Создаем копию списка, на котором будем производить сортировку. Он же будет результирующим.
     try:
         _elements: list[T] = list(elements)

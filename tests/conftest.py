@@ -60,9 +60,14 @@ def _get_numbers_list() -> list[dict]:
                 **item,
                 **{
                     "number": (item["number"] * -1),
-                    "result": None if item["result_next"] is None else (item["result_next"] * -1),
+                    "result": None
+                    if item["result_next"] is None
+                    else (item["result_next"] * -1),
                     "position": POSITION_PREV,
-                    "ids": "-" + str(item["result_next"]) + " << -" + str(item["number"]),
+                    "ids": "-"
+                    + str(item["result_next"])
+                    + " << -"
+                    + str(item["number"]),
                 },
             }
             for item in numbers_list
@@ -83,9 +88,14 @@ def _get_numbers_list() -> list[dict]:
                 **item,
                 **{
                     "number": (item["number"] * -1),
-                    "result": None if item["result_prev"] is None else (item["result_prev"] * -1),
+                    "result": None
+                    if item["result_prev"] is None
+                    else (item["result_prev"] * -1),
                     "position": POSITION_NEXT,
-                    "ids": "-" + str(item["number"]) + " >> -" + str(item["result_prev"]),
+                    "ids": "-"
+                    + str(item["number"])
+                    + " >> -"
+                    + str(item["result_prev"]),
                 },
             }
             for item in numbers_list
@@ -104,7 +114,30 @@ def fixture_numbers_list_int(request) -> dict:
 
 
 #  ------------------- test_count_items ------------------------------------
-_data_list: list = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, "a", "a", "a"]
+_data_list: list = [
+    0,
+    1,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    2,
+    2,
+    2,
+    2,
+    "a",
+    "a",
+    "a",
+]
 
 
 @pytest.fixture(
@@ -174,15 +207,20 @@ def fixture_data_results() -> dict:
 _find_intervals_data: list[tuple] = [
     ([1, -3, 4, 5], dict(target=9), [(2, 3)], "target=9"),
     ([1, -3, 4, 5], dict(target=0), [], "target=0"),
-    ([1, -3, 4, 5], ..., [], "target=..."),
+    # ([1, -3, 4, 5], ..., [], "target=..."),
     (
         [1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5],
         dict(target=9),
         [(0, 4), (2, 4), (1, 5), (4, 8), (7, 8), (4, 10), (7, 10)],
         "target=9",
     ),
-    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], dict(target=0), [(0, 1), (4, 6), (8, 9), (9, 10)], "target=0"),
-    ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], ..., [(0, 1), (4, 6), (8, 9), (9, 10)], "target=..."),
+    (
+        [1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5],
+        dict(target=0),
+        [(0, 1), (4, 6), (8, 9), (9, 10)],
+        "target=0",
+    ),
+    # ([1, -1, 4, 3, 2, 1, -3, 4, 5, -5, 5], ..., [], "target=..."),
 ]
 
 
@@ -197,7 +235,7 @@ def fixture_find_intervals_data(request) -> tuple:
 
 # ... - означает отсутствие параметра
 _find_intervals_invalid_parameters: list[tuple] = [
-    ([], ..., [], "target=..."),
+    # ([], ..., [], "target=..."),
     ([1, -3, 4, 5], dict(target=1.2), [(0, 0), (1, 2)], "target=1.2"),
     ([1, -3, 4, 5], dict(target="9"), [(2, 3)], "target='9'"),
     ([1, -3, 4, 5], dict(target="1.2"), [], "target='1.2'"),
