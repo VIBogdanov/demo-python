@@ -3,7 +3,7 @@ from collections.abc import Generator, Iterable
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
-from typing import NamedTuple, TypeVar
+from typing import TypeVar
 
 from assistools import ilen
 
