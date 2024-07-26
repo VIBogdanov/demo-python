@@ -309,7 +309,7 @@ def find_item_by_interpolation(
                 )
             )
 
-            match ...:  # Сравниваем срединный элемент с искомым значением
+            match ...:  # Сравниваем вычисленный элемент с искомым значением
                 # Если искомое значение найдено, прекращаем дальнейший поиск и возвращаем найденный индекс
                 case _ if elements[i_current] == target:
                     i_target = i_current
@@ -417,18 +417,18 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
         list: Результирующий отсортированный список.
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
-    try:
-        _elements: list = list(elements)
-    except (ValueError, TypeError):
-        return []
+    # try:
+    #    _elements: list = list(elements)
+    # except (ValueError, TypeError):
+    #    return []
 
-    if len(_elements) > 1:
+    if len(elements) > 1:
         # Делим исходный список пополам.
-        i_middle: int = len(_elements) // 2
+        i_middle: int = len(elements) // 2
         # Рекурсивно вызываем функцию до тех пор,
         # пока исходный список не будет разложен поэлементно.
-        left_list: list = sort_by_merge(_elements[:i_middle], revers=revers)
-        right_list: list = sort_by_merge(_elements[i_middle:], revers=revers)
+        left_list: list = sort_by_merge(elements[:i_middle], revers=revers)
+        right_list: list = sort_by_merge(elements[i_middle:], revers=revers)
         # Собираем список из стека рекурсивных вызовов
         i_left: int = 0
         i_right: int = 0
@@ -441,20 +441,20 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
                 if revers
                 else (right_list[i_right] > left_list[i_left])
             ):
-                _elements[i_result] = left_list[i_left]
+                elements[i_result] = left_list[i_left]
                 i_left += 1
             else:
-                _elements[i_result] = right_list[i_right]
+                elements[i_result] = right_list[i_right]
                 i_right += 1
             i_result += 1
         # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
         match (i_left < len(left_list), i_right < len(right_list)):
             case (True, False):
-                _elements[i_result:] = left_list[i_left:]
+                elements[i_result:] = left_list[i_left:]
             case (False, True):
-                _elements[i_result:] = right_list[i_right:]
+                elements[i_result:] = right_list[i_right:]
 
-    return _elements
+    return elements
 
 
 # --------------------------------------------------------------------------------------------
@@ -614,8 +614,9 @@ class GetRangesSort(Iterable):
 
     def __get_fibonacci_gen(self, ln: int) -> Iterator[int]:
         """
-        Формирует отличную от классической последовательность: вместо [1,1,2,3,5...] получаем [1,2,3,5...]
-        Дублирование первых двух единиц не требуется.
+        Формирует отличную от классической последовательность:
+        вместо [0,1,1,2,3,5...] получаем [1,2,3,5...]
+        Ноль и дублирование первых двух единиц не требуется.
         """
         prev: int = 1
         curr: int = 1
@@ -773,7 +774,7 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
 
 # -------------------------------------------------------------------------------------------------
-def get_common_divisor(number_a: TInt, number_b: TInt) -> int:
+def get_common_divisor(number_a: TInt, number_b: TInt) -> int | None:
     """
     Алгоритм нахождения наибольшего общего делителя двух целых чисел без перебора.
     Используется метод Евклида. Например, для чисел 20 и 12:
@@ -792,7 +793,7 @@ def get_common_divisor(number_a: TInt, number_b: TInt) -> int:
         number_b (int): Второе число
 
     Returns:
-        int: Наибольший общий делитель. Как минимум 1 является общим делителем для всех чисел.
+        int: Наибольший общий делитель. Если делитель равен 0, возвращает None.
     """
     # На всякий случай
     number_a = get_positive_int(number_a)
@@ -808,7 +809,7 @@ def get_common_divisor(number_a: TInt, number_b: TInt) -> int:
     while divisor:
         divisible, divisor = divisor, divisible % divisor
 
-    return divisible
+    return divisible if bool(divisible) else None
 
 
 # --------------------------------------------------------------------------------------------

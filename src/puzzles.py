@@ -1,9 +1,11 @@
 from collections import Counter, defaultdict, deque
-from collections.abc import Collection, Generator, Iterable
+from collections.abc import Generator, Iterable
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
 from typing import NamedTuple, TypeVar
+
+from assistools import ilen
 
 T = TypeVar("T")
 
@@ -212,80 +214,44 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_combination_numbers(digits: Collection[int]) -> list[tuple[int, ...]]:
+def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
     """
     Сформировать все возможные уникальные наборы чисел из указанных цифр.
     Цифры можно использовать не более одного раза в каждой комбинации.
     При этом числа не могут содержать в начале 0 (кроме самого нуля).
 
     Args:
-        digits (list[int]): Список заданных цифр
+        digits: Список заданных цифр
 
     Returns:
         list[int]: Список уникальных комбинаций
     """
 
-    # Класс данных для удобства загрузки-выгрузки данных в очередь
-    class ComboNums(NamedTuple):
-        # Список двух-, трех-  т.д. значных цифр, составленных из цифр исходного списка
-        Numbers_List: list[int]
-        # Оставшиеся от исходного списка цифры после формирования списка чисел
-        Digits_List: Collection[int]
-
-    # Результирующий список как множество, дабы исключить дубликаты
-    results = set()
-    # Предварительно в результирующий список сохраняем все комбинации из цифр
-    # исходного списка (состоящие из одной цифры) и удаляем дубли
+    # Предварительно в результирующий список сохраняем все комбинации
+    # из одиночных цифр исходного списка и удаляем дубли
     results = set(permutations(digits))
 
-    # Очередь потребуется для хранения списков, требующих обработки
-    query_buff: deque = deque()
-    # Перед запуском цикла обработки загружаем в очередь исходный список
-    query_buff.append(ComboNums(list(), digits))
-
-    while query_buff:
-        # Пока в очереди есть что обрабатывать выгружаем список для обработки
-        combo_numbers: ComboNums = query_buff.pop()
-        # Формируем генератор, который из цифр списка составляет двухзначные, трехзначные и т.д. числа
-        # Т.к. числа, состоящие из одной цифры, уже обработаны, начинаем с двухзначных чисел
-        gen_digits_list: Generator[tuple[int, ...], None, None] = (
-            digit
-            for perms in (
-                set(permutations(combo_numbers.Digits_List, i))
-                for i in range(2, len(combo_numbers.Digits_List) + 1)
-            )
-            for digit in perms
-            if digit[0] != 0  # Исключаем числа начинающиеся с нуля
+    # Формируем генератор, который из цифр списка составляет двухзначные, трехзначные и т.д. числа
+    # Т.к. числа, состоящие из одной цифры, уже обработаны, начинаем с двухзначных чисел
+    gen_digits_list: Generator[tuple[int, ...], None, None] = (
+        combo_digits
+        for perms in (set(permutations(digits, i)) for i in range(2, ilen(digits) + 1))
+        for combo_digits in perms
+        if combo_digits[0] != 0  # Исключаем числа начинающиеся с нуля
+    )
+    # Перебираем все полученные двухзначные, трехзначные и т.д. числа
+    for selected_digits in gen_digits_list:
+        # Удаляем из списка цифры, из которых состоят двухзначных, трехзначных и т.д. числа.
+        # Например, для числа 12 из исходного списка удаляем цифры 1 и 2
+        digits_count = Counter(digits)
+        digits_count.subtract(selected_digits)
+        # Из отобранных цифр (в нашем примере 1 и 2) формируем число 12
+        num: int = reduce(
+            lambda dig_prev, dig_next: 10 * dig_prev + dig_next, selected_digits
         )
-        # Перебираем все полученные двухзначные, трехзначные и т.д. числа
-        for selected_digits in gen_digits_list:
-            # Удаляем из списка цифры, из которых состоят двухзначных, трехзначных и т.д. числа.
-            # Например, для числа 12 из исходного списка удаляем цифры 1 и 2
-            digits_count = Counter(combo_numbers.Digits_List)
-            digits_count.subtract(selected_digits)
-            # Из отобранных цифр (в нашем примере 1 и 2) формируем число 12
-            num: int = reduce(
-                lambda dig_prev, dig_next: 10 * dig_prev + dig_next, selected_digits
-            )
-            # В результирующий список записываем все возможные комбинации числа 12 и оставшихся цифр
-            results.update(
-                set(
-                    permutations(
-                        combo_numbers.Numbers_List
-                        + [num]
-                        + list(digits_count.elements())
-                    )
-                )
-            )
-            # Если количество оставшихся цифр в списке 2 и более, то есть возможность
-            # сформировать комбинации из трехзначных и более чисел из оставшихся цифр.
-            if digits_count.total() > 1:
-                query_buff.append(
-                    ComboNums(
-                        combo_numbers.Numbers_List + [num],
-                        list(digits_count.elements()),
-                    )
-                )
+        # В результирующий список записываем все возможные комбинации числа 12 и оставшихся цифр
+        results.update(set(permutations(chain((num,), digits_count.elements()))))
+
     # Формируем список результатов и сортируем его для удобства отображения
     list_results = list(results)
     list_results.sort()
@@ -329,7 +295,7 @@ def closest_amount(
         for next_sum, next_numbers in (
             (
                 (current_sum + number),
-                # Сортировка позволяет избежать дублирование списков
+                # Сортировка позволяет избежать дублирования списков при добавлении в max_sum_numbers
                 sorted(current_numbers + [number]),
             )
             for number in numbers
@@ -345,17 +311,21 @@ def closest_amount(
                 max_sum_numbers.add(tuple(next_numbers))
             # Одна и та же сумма, может быть получена различными комбинациями чисел из входного массива.
             elif next_sum == max_sum:
+                # Т.к. max_sum_numbers - это set, то совпадающие списки чисел отфильтровываются
                 max_sum_numbers.add(tuple(next_numbers))
             # Добавляем в очередь очередную сумму со списком чисел для дальнейшей обработки.
-            query_buff.append((next_sum, next_numbers))
+            if (next_sum, next_numbers) not in query_buff:
+                query_buff.append((next_sum, next_numbers))
 
-    return (max_sum, list(tuple(max_sum_numbers)))
+    return (max_sum, list(max_sum_numbers))
 
 
 # -------------------------------------------------------------------------------------------------
 def main():
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
-    print(f" get_combination_numbers([2, 7]) -> {get_combination_numbers([0, 2, 7])}")
+    print(
+        f" get_combination_numbers([0, 2, 7]) -> {get_combination_numbers([0, 2, 7])}"
+    )
 
     print(
         "\n- Минимальное количество перестановок, которое необходимо произвести для выравнивания списков."

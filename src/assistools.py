@@ -1,10 +1,12 @@
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Iterable, Iterator, Sequence
+from itertools import count
 from multiprocessing import Pool, cpu_count
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 TAny = TypeVar("TAny")
+T = TypeVar("T")
 NumberStrNone: TypeAlias = int | float | str | None
 
 
@@ -91,7 +93,7 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
     итерация прерывается.
 
     Args:
-        args (tuple[Iterable, bool]): Кортеж параметров - итератор списока для проверки и
+        args (tuple[Iterable, bool]): Кортеж параметров - итератор списка для проверки и
         направление сортировки
 
     Returns:
@@ -105,7 +107,7 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
         return True
 
     for _next in elements:
-        if (_next > _prev) if is_revers else (_prev > _next):
+        if (_prev < _next) if is_revers else (_next < _prev):
             return False
         _prev = _next
 
@@ -239,8 +241,34 @@ def is_includes_elements(data: Iterable[Any], pattern: Iterable[Any]) -> bool:
     cdata.subtract(Counter(pattern))
     # Удаляем из словаря все элементы, количество которых больше или равно нулю
     # Если словарь становится пустым, то проверяемый список полностью содержится в исходном
-    # Иначе в проверяемом списке есть элементы, которых нет в исходном, либо их меньше
+    # Иначе в проверяемом списке есть элементы, которых нет в исходном, либо их больше, чем в исходном
     return len(-cdata) == 0
+
+
+# -------------------------------------------------------------------------------------------------
+def ilen(iterable: Iterable[T]) -> int:
+    """
+    Подсчитывает количество элементов в итераторе. Попытка достичь компромиса между
+    скоростью и потреблением памяти.
+    По сравнению с len(tuple(iterable)) работает медленнее, но при этом практически
+    не потребляет память.
+
+    Args:
+        iterable: Набор данных, который поддерживает итерации.
+
+    Returns:
+        int: Количество элементов в данных.
+    """
+    # Если объект данных поддерживает метод len, то используем встроенный механизм
+    if hasattr(iterable, "__len__"):
+        return len(iterable)
+    # Бесконечный счетчик-итератор
+    _counter = count()
+    # Создаем очередь нулевой длины. Используется только для инкреминтирования счетчика _counter.
+    # Очередь никаких данных не хранит.
+    deque(zip(iterable, _counter), 0)
+    # Возвращаем значение счетчика
+    return next(_counter)
 
 
 # -------------------------------------------------------------------------------------------------
