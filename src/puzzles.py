@@ -3,11 +3,12 @@ from collections.abc import Generator, Iterable
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 from assistools import ilen
 
 T = TypeVar("T")
+TIntNone: TypeAlias = int | None
 
 
 # --------------------------------------------------------------------------------
@@ -239,16 +240,16 @@ def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
         for combo_digits in perms
         if combo_digits[0] != 0  # Исключаем числа начинающиеся с нуля
     )
-    # Перебираем все полученные двухзначные, трехзначные и т.д. числа
+    # Перебираем все полученные двухзначные, трехзначные и т.д. наборы цифр
     for selected_digits in gen_digits_list:
-        # Удаляем из списка цифры, из которых состоят двухзначных, трехзначных и т.д. числа.
-        # Например, для числа 12 из исходного списка удаляем цифры 1 и 2
-        digits_count = Counter(digits)
-        digits_count.subtract(selected_digits)
         # Из отобранных цифр (в нашем примере 1 и 2) формируем число 12
         num: int = reduce(
             lambda dig_prev, dig_next: 10 * dig_prev + dig_next, selected_digits
         )
+        # Удаляем из списка цифры, из которых состоят двухзначных, трехзначных и т.д. числа.
+        # Например, для числа 12 из исходного списка удаляем цифры 1 и 2
+        digits_count = Counter(digits)
+        digits_count.subtract(selected_digits)
         # В результирующий список записываем все возможные комбинации числа 12 и оставшихся цифр
         results.update(set(permutations(chain((num,), digits_count.elements()))))
 
@@ -321,6 +322,40 @@ def closest_amount(
 
 
 # -------------------------------------------------------------------------------------------------
+def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
+    """
+    Находит две пары множителей в массиве чисел, дабы получить минимально возможное
+    и максимально возможное произведение. Допускаются отрицательные значения и ноль.
+
+    Args:
+        iterable: Набор чисел.
+
+    Returns:
+        tuple(min, max): Пара минимального и максимального значений произведения.
+    """
+    result: tuple[TIntNone, TIntNone] = (None, None)
+    # Копируем, дабы не нарушить порядок исходного списка
+    try:
+        _elements: list = list(iterable)
+    except (ValueError, TypeError):
+        return result
+
+    if len(_elements) < 2:
+        return result
+    # Сортировка обязательна
+    _elements.sort()
+
+    match (_elements[0] < 0, _elements[-1] < 0):
+        case (True, True):  # Все числа отрицательные
+            result = (_elements[-1] * _elements[-2], _elements[0] * _elements[1])
+        case (True, False):  # Часть чисел отрицательные
+            result = (_elements[0] * _elements[-1], _elements[-1] * _elements[-2])
+        case (False, False):  # Все числа неотрицательные (включая ноль)
+            result = (_elements[0] * _elements[1], _elements[-1] * _elements[-2])
+    return result
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
     print(
@@ -339,6 +374,11 @@ def main():
 
     print("\n- Получить число, максимально близкое к числу X, из суммы чисел массива.")
     print(f" closest_amount([20, 30, 38], 112) -> {closest_amount([20, 30, 38], 112)}")
+
+    print(
+        "\n- Находит минимальное и максимальное произведение пары чисел из списка значений."
+    )
+    print(f" get_minmax_prod([1, -2, 5, 4]) -> {get_minmax_prod([1, -2, 5, 4])}")
 
 
 if __name__ == "__main__":
