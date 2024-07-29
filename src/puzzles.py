@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict, deque
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Iterator
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
@@ -327,6 +327,10 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
     Находит две пары множителей в массиве чисел, дабы получить минимально возможное
     и максимально возможное произведение. Допускаются отрицательные значения и ноль.
 
+    Details: Попытка реализовать максимально обобщенный вариант без индексирования,
+    без сортировки, без вычисления размера данных и без изменения исходных данных.
+    Используется только итератор.
+
     Args:
         iterable: Набор чисел.
 
@@ -334,24 +338,36 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
         tuple(min, max): Пара минимального и максимального значений произведения.
     """
     result: tuple[TIntNone, TIntNone] = (None, None)
-    # Копируем, дабы не нарушить порядок исходного списка
+    # Получаем итератор для однократного прохождения по элементам данных.
+    # По производительности сравнимо с сортировкой, но при этом не модифицирует исходные данные.
+    it_elements: Iterator[int] = iter(iterable)
+    # Инициализируем первым элементом исходных данных.
     try:
-        _elements: list = list(iterable)
-    except (ValueError, TypeError):
-        return result
+        min1 = min2 = max1 = max2 = next(it_elements)
+    except StopIteration:
+        return result  # Если список исходных данных пуст
+    # Вычисляем первые два минимальные и последние два максимальные значения
+    for elm in it_elements:
+        if elm < min1:
+            min1, min2 = elm, min1
+        elif elm < min2 or min1 == min2:
+            min2 = elm
 
-    if len(_elements) < 2:
-        return result
-    # Сортировка обязательна
-    _elements.sort()
+        if max1 < elm:
+            max1, max2 = elm, max1
+        elif max2 < elm or max1 == max2:
+            max2 = elm
+    # Данные вычисления в любом случае потребуются далее. Для удобства чтения кода.
+    min_prod = min1 * min2
+    max_prod = max1 * max2
 
-    match (_elements[0] < 0, _elements[-1] < 0):
+    match (min1 < 0, max1 < 0):
         case (True, True):  # Все числа отрицательные
-            result = (_elements[-1] * _elements[-2], _elements[0] * _elements[1])
+            result = (max_prod, min_prod)
         case (True, False):  # Часть чисел отрицательные
-            result = (_elements[0] * _elements[-1], _elements[-1] * _elements[-2])
+            result = (min1 * max1, min_prod if (max_prod < min_prod) else max_prod)
         case (False, False):  # Все числа неотрицательные (включая ноль)
-            result = (_elements[0] * _elements[1], _elements[-1] * _elements[-2])
+            result = (min_prod, max_prod)
     return result
 
 
