@@ -225,6 +225,9 @@ def main():
     DIR_NAME = r"data"
     CSV_NAME = r"requests.csv"
 
+    IS_SAVETOEXCEL = False
+    IS_CHECKDATAFRAME = False
+
     # Полный путь до csv-файла. В данном случае считается, что файл csv храниться
     # в подпапке data родительского каталога для текущего фала на один уровень выше.
     # Например: если текущий файл хранится в папке /samefolders/src/reqfil.py,
@@ -247,12 +250,12 @@ def main():
         # Т.к. генератор возвращает именованную структуру NamedTuple похожую на DataClass,
         # то возможно создание DataFrame без промежуточного словаря прямо из генератора
         dfr = DataFrame(requests_generator)
-        """ Для диагностики
-        if len(dfr) > 0:
-            print(dfr[["request", "quantity", "words"]])
-        else:
-            print(dfr.info())
-        """
+        if IS_CHECKDATAFRAME:
+            if len(dfr) > 0:
+                print(dfr[["request", "quantity", "words"]])
+            else:
+                print(dfr.info())
+
         # Если выборка запросов не пуста
         if len(dfr) > 0:
             # Подсчитываем встречаемость слов в отобранных запросах
@@ -267,14 +270,12 @@ def main():
             dfw.sort_values(by=["count"], ascending=False, inplace=True)
 
             # Сохраняем оба полученных DataFrame в Excel на отдельных листах с перезаписью
-            # Для использования необходимо раскомментировать
-            """
-            with ExcelWriter(exel_filename) as xls_writer:
-                dfr[["request", "quantity"]].to_excel(
-                    xls_writer, sheet_name="requests", index=False
-                )
-                dfw.to_excel(xls_writer, sheet_name="words", index=False)
-            """
+            if IS_SAVETOEXCEL:
+                with ExcelWriter(exel_filename) as xls_writer:
+                    dfr[["request", "quantity"]].to_excel(
+                        xls_writer, sheet_name="requests", index=False
+                    )
+                    dfw.to_excel(xls_writer, sheet_name="words", index=False)
 
 
 if __name__ == "__main__":
