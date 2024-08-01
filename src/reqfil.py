@@ -1,3 +1,19 @@
+"""
+Модуль обработки csv-файла с миллионом записей, состоящих из текста запроса
+пользователей и количество этих запросов за определенный период времени.
+На входе задается поисковая фраза и метод поиска поисковой фразы в запросе.
+В поисковой фразе можно задавать якорные и сопутствующие слова.
+Любое слово, начинающееся с заглавной буквы, считается якорным.
+Особенность якорных слов - они всегда присутствуют в комбинациях поиска.
+
+Например: в поисковой фразе "Платье женское летнее" поиск будет производится по
+следующим комбинациям: ["платье", "платье женское", "платье летнее", "платье женское летнее"],
+т.е. якорное слово "Платье" всегда присутствует в поиске, а сопутствующие слова могут
+отсутствовать вовсе или присутствовать в различных комбинациях.
+Если задать поисковую фразу "платье женское летнее" или "Платье Женское Летнее",
+то поиск будет производится по единственной комбинации ["платье женское летнее"]
+"""
+
 from collections.abc import Callable, Generator
 from enum import Enum, auto
 from itertools import chain, combinations
@@ -9,25 +25,44 @@ from pandas import DataFrame, ExcelWriter
 STRIP_TEMPL = ' .,:;"!?-=()[]'
 
 
+# Перечисление методов сравнения поисковой фразы с запросом
 class CompareType(str, Enum):
-    Full = auto()
-    Sub = auto()
-    Any = auto()
-    All = auto()
+    Full = auto()  # Полное совпадение
+    Sub = auto()  # Поисковая фраза содержится в запросе
+    Any = auto()  # Хотя бы одно любое слово из поисковой фразы содержится в запросе
+    All = auto()  # Поисковая фраза игнорируется
 
 
+# Структура для извлеченного из файла запроса
 class Request(NamedTuple):
-    request: str
-    quantity: int
-    words: set[str]
+    request: str  # Оригинальный текст запроса
+    quantity: int  # Количество запросов за период
+    words: set[str]  # Список очищенных слов, из которых состоит запрос
 
 
+# Поисковая фраза после обработки
 class Phrase(NamedTuple):
+    # Комбинации слов, из которых состоит поисковая фраза
     combo_words: list[set[str]]
-    compare_type: CompareType
+    compare_type: CompareType  # Выбранный метод сравнения
 
 
 def get_request(csv_filename: str | Path) -> Generator[Request, None, None]:
+    """Функция-генератор считывает записи из csv-фала и производит
+    следующую обработку:
+    - Разделяет записи на текст запроса и на количество запросов за период
+    - Разбирает текст запроса на отдельные слова
+    - Очищает список слов от небуквенных знаков
+
+    При этом файл не загружается в память целиком, а считывается построчно.
+
+    Args:
+        csv_filename (str | Path): Полный путь к csv-фалу, включая имя самого файла
+
+    Yields:
+        Generator[Request]: Возвращает структуру Request,
+        содержащей запрос, количество и список слов
+    """
     with open(
         csv_filename, encoding="utf-8-sig", mode="rt", buffering=102400
     ) as csv_file:
@@ -50,29 +85,39 @@ def get_request(csv_filename: str | Path) -> Generator[Request, None, None]:
 def get_phrase(
     phrase_string: str, compare_type: CompareType = CompareType.Any
 ) -> Phrase:
+    """Разбирает поисковую фразу на отдельные слова и создает комбинации из
+    якорных слов и сопутствующих.
+
+    Args:
+        phrase_string (str): Поисковая фраза
+        compare_type (CompareType, optional): Тип метода сравнения. Defaults to CompareType.Any.
+
+    Returns:
+        Phrase: Возвращает структуру из комбинации слов поисковой фразы и метода сравнения.
+    """
     # Результирующая комбинация якорных и сопутствующих слов
     phrase_combo_words: list[set[str]] = list()
 
     # раскладываем поисковую фразу на отдельные слова и очищаем их
+    # используем генератор для будущего однократного прохода без сохранения промежуточных данных
     phrase_string_clear: Generator[str, None, None] = (
         word for word in map(lambda w: w.strip(STRIP_TEMPL), phrase_string.split())
     )
 
     match compare_type:
         case CompareType.Full | CompareType.Sub:
+            # два отдельных set для якорных и сопутствующих слов
+            # используются для комбинирования якорных слов с сопутствующими
             phrase_fix_words: set[str] = set()
             phrase_words: set[str] = set()
-            # Из общего списка слов выделяем якорные слова и сопутствующие.
+
             for word in phrase_string_clear:
                 if word[0].isupper():  # формируем список якорных слов
                     phrase_fix_words.add(word.lower())
                 else:  # формируем список сопутствующих слов
                     phrase_words.add(word.lower())
-
-            # print(phrase_fix_words)
             # Возможна ситуация когда одно и тоже слово попадет в оба списка. Человеческий фактор
             phrase_words -= phrase_fix_words
-            # print(phrase_words)
 
             # если есть что комбинировать
             if phrase_words and phrase_fix_words:
@@ -91,9 +136,9 @@ def get_phrase(
                     phrase_words
                 ) if phrase_words else phrase_combo_words.append(phrase_fix_words)
         case CompareType.Any:
-            # Просто добавляем список слов поисковой фразы. Комбинировать не нужно
+            # Просто добавляем список всех слов поисковой фразы. Комбинировать не нужно
             phrase_combo_words.append(set(word.lower() for word in phrase_string_clear))
-    # print(phrase_combo_words)
+
     # В последнем случае (CompareType.All) посисковая фраза не используется. Возвращаем пустой список
     return Phrase(phrase_combo_words, compare_type)
 
@@ -101,6 +146,26 @@ def get_phrase(
 def get_check_request(
     phrase: Phrase, min_quantity: int = 1
 ) -> Callable[[Request], bool]:
+    """Формирует функцию, которая будет использована при отборе запросов из csv-фала.
+    В зависимости от выбранного метода, применяются следующие механизмы отбора:
+    - Full - полное совпадение поисковой фразы с запросом. Например: "платье женское" == "платье женское"
+    При этом порядок слов в запросе не важен: "платье женское" == "женское платье"
+    - Sub - запрос должен содержать поисковую фразу: "платье женское" == "платье женское летнее"
+    - Any - запрос должен содержать хотя бы одно (или более) любое слово из поисковой фразы.
+    Например: "платье женское" == "платье с длинными рукавами" или "платье женское" == "пальто женское зимнее"
+    - All - полностью игнорируется поисковая фраза. Учитывается только параметр min_quantity, который
+    отфильтровывает низкочастотные запросы. Например: при min_quantity = 1000 в выборку попадут запросы
+    с частотой появления за период не ниже 1000 включительно.
+
+    Args:
+        phrase (Phrase): Структура с обработанной поисковой фразой, содержащая комбинации слов поисковой фразы и метод сравнения.
+
+        min_quantity (int, optional): Минимальная частота появления запроса за период. Defaults to 1 - все запросы.
+
+    Returns:
+        Callable[[Request], bool]: Функция, сравнивающая поисковую фразу с запросом и возвращающая True,
+        если сравнение успешно.
+    """
     match phrase.compare_type:
         # Поисковая фраза полностью совпадает с текстом запроса. Порядок слов не важен.
         case CompareType.Full:
@@ -140,42 +205,51 @@ def get_check_request(
             def nofn(_: Request) -> bool:
                 return False
 
+            # None - признак невозможности определить функцию сравнения.
             nofn.compare = None
             return nofn
-
+    # В атрибуте возвращаемой функции сохраняем метод сравнения
     fn.compare = phrase.compare_type
     return fn
 
 
 def main():
+    # Для данного демонстрационного проекта отсутствует возможность задавать параметры через командную строку.
     # Локальные константы
     SEARCH_PHRASE = "Платье платье женское летнее"
-    MIN_QUANTITY: int = 1
+    MIN_QUANTITY: int = 1  # Позволяет отфильтровать малочисленные запросы.
     COMPARE_TYPE = CompareType.Full
 
     DIR_NAME = r"data"
     CSV_NAME = r"requests.csv"
 
+    # Полный путь до csv-файла. В данном случае считается, что файл csv храниться
+    # в подпапке data родительского каталога для текущего фала на один уровень выше.
+    # Например: если текущий файл хранится в папке /samefolders/src/reqfil.py,
+    # то csv файл должен быть расположен в папке /samefolders/data/requests.csv
     csv_filename = Path(Path(__file__).parents[1], DIR_NAME, CSV_NAME)
+    # Файл Excel сохраняем рядом в той же папке с тем же именем
     exel_filename = csv_filename.with_suffix(".xlsx")
 
-    # определяем метод сравнения запросов с поисковой фразой
+    # определяем функцию сравнения запросов с поисковой фразой
     check_request = get_check_request(
         get_phrase(SEARCH_PHRASE, COMPARE_TYPE), MIN_QUANTITY
     )
-    # Если удалось определить метод сравнения
+    # Если удалось определить функцию сравнения. Иначе программа завершиться досрочно без какой-либо обработки.
     if check_request.compare is not None:
-        # формируем генератор для отбора запросов по поисковой фразе
+        # формируем генератор для построчного отбора запросов по поисковой фразе
         requests_generator: Generator[Request, None, None] = (
             request for request in get_request(csv_filename) if check_request(request)
         )
         # Т.к. генератор возвращает именованную структуру NamedTuple похожую на DataClass,
         # то возможно создание DataFrame без промежуточного словаря прямо из генератора
         dfr = DataFrame(requests_generator)
+        """ Для диагностики
         if len(dfr) > 0:
             print(dfr[["request", "quantity", "words"]])
         else:
             print(dfr.info())
+        """
         # Если выборка запросов не пуста
         if len(dfr) > 0:
             # Подсчитываем встречаемость слов в отобранных запросах
