@@ -12,6 +12,8 @@
 отсутствовать вовсе или присутствовать в различных комбинациях.
 Если задать поисковую фразу "платье женское летнее" или "Платье Женское Летнее",
 то поиск будет производится по единственной комбинации ["платье женское летнее"]
+
+Внимание!!! Используются две сторонние библиотеки: pandas и openpyxl
 """
 
 from collections.abc import Callable, Generator
@@ -78,7 +80,7 @@ def get_request(csv_filename: str | Path) -> Generator[Request, None, None]:
             yield Request(
                 req_str,
                 qty_int,
-                set(map(lambda x: x.strip(STRIP_TEMPL).lower(), req_str.split())),
+                set(map(lambda w: w.strip(STRIP_TEMPL).lower(), req_str.split())),
             )
 
 
@@ -100,7 +102,7 @@ def get_phrase(
 
     # раскладываем поисковую фразу на отдельные слова и очищаем их
     # используем генератор для будущего однократного прохода без сохранения промежуточных данных
-    phrase_string_clear: Generator[str, None, None] = (
+    phrase_words_clear: Generator[str, None, None] = (
         word for word in map(lambda w: w.strip(STRIP_TEMPL), phrase_string.split())
     )
 
@@ -111,12 +113,12 @@ def get_phrase(
             phrase_fix_words: set[str] = set()
             phrase_words: set[str] = set()
 
-            for word in phrase_string_clear:
+            for word in phrase_words_clear:
                 if word[0].isupper():  # формируем список якорных слов
                     phrase_fix_words.add(word.lower())
                 else:  # формируем список сопутствующих слов
                     phrase_words.add(word.lower())
-            # Возможна ситуация когда одно и тоже слово попадет в оба списка. Человеческий фактор
+            # Возможна ситуация когда одинаковое слово попадет в оба списка. Человеческий фактор
             phrase_words -= phrase_fix_words
 
             # если есть что комбинировать
@@ -137,7 +139,7 @@ def get_phrase(
                 ) if phrase_words else phrase_combo_words.append(phrase_fix_words)
         case CompareType.Any:
             # Просто добавляем список всех слов поисковой фразы. Комбинировать не нужно
-            phrase_combo_words.append(set(word.lower() for word in phrase_string_clear))
+            phrase_combo_words.append(set(word.lower() for word in phrase_words_clear))
 
     # В последнем случае (CompareType.All) посисковая фраза не используется. Возвращаем пустой список
     return Phrase(phrase_combo_words, compare_type)
@@ -194,7 +196,7 @@ def get_check_request(
                     not phrase.combo_words[0].isdisjoint(request.words)
                     and request.quantity >= min_quantity
                 )
-        # Игнорируем поисковую фразу и выводим весь список запросов
+        # Игнорируем поисковую фразу и выводим весь список запросов с учетом минимального количества
         case CompareType.All:
 
             def fn(request: Request) -> bool:
@@ -227,6 +229,7 @@ def main():
     # в подпапке data родительского каталога для текущего фала на один уровень выше.
     # Например: если текущий файл хранится в папке /samefolders/src/reqfil.py,
     # то csv файл должен быть расположен в папке /samefolders/data/requests.csv
+    # Чтобы работать в текущей папке: csv_filename = Path(Path(__file__), CSV_NAME)
     csv_filename = Path(Path(__file__).parents[1], DIR_NAME, CSV_NAME)
     # Файл Excel сохраняем рядом в той же папке с тем же именем
     exel_filename = csv_filename.with_suffix(".xlsx")
