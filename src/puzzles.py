@@ -231,12 +231,12 @@ def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
     # Предварительно в результирующий список сохраняем все комбинации
     # из одиночных цифр исходного списка и удаляем дубли
     results = set(permutations(digits))
-
+    range_size = ilen(digits) + 1
     # Формируем генератор, который из цифр списка составляет двухзначные, трехзначные и т.д. числа
     # Т.к. числа, состоящие из одной цифры, уже обработаны, начинаем с двухзначных чисел
     gen_digits_list: Generator[tuple[int, ...], None, None] = (
         combo_digits
-        for perms in (set(permutations(digits, i)) for i in range(2, ilen(digits) + 1))
+        for perms in (set(permutations(digits, i)) for i in range(2, range_size))
         for combo_digits in perms
         if combo_digits[0] != 0  # Исключаем числа начинающиеся с нуля
     )
@@ -346,13 +346,14 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
         min1 = min2 = max1 = max2 = next(it_elements)
     except StopIteration:
         return result  # Если список исходных данных пуст
-    # Вычисляем первые два минимальные и последние два максимальные значения
+
     for elm in it_elements:
+        # Вычисляем первые два минимальные значения
         if elm < min1:
             min1, min2 = elm, min1
         elif elm < min2 or min1 == min2:
             min2 = elm
-
+        #  и последние два максимальные значения
         if max1 < elm:
             max1, max2 = elm, max1
         elif max2 < elm or max1 == max2:
