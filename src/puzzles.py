@@ -343,22 +343,34 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
     it_elements: Iterator[int] = iter(iterable)
     # Инициализируем первым элементом исходных данных.
     try:
-        min1 = min2 = max1 = max2 = next(it_elements)
+        min1 = max1 = next(it_elements)
     except StopIteration:
         return result  # Если список исходных данных пуст
+
+    try:
+        min2 = max2 = next(it_elements)
+    except StopIteration:
+        return (min1, max1)  # Список исходных данных состоит из одного значения
+
+    # Важно изначально инициализировать min и max корректными относительными значениями
+    if min2 < min1:
+        min1, min2 = min2, min1
+
+    if max1 < max2:
+        max1, max2 = max2, max1
 
     for elm in it_elements:
         # Вычисляем первые два минимальные значения
         if elm < min1:
             min1, min2 = elm, min1
-        elif elm < min2 or min1 == min2:
+        elif elm < min2:
             min2 = elm
         #  и последние два максимальные значения
         if max1 < elm:
             max1, max2 = elm, max1
-        elif max2 < elm or max1 == max2:
+        elif max2 < elm:
             max2 = elm
-    # Данные вычисления в любом случае потребуются далее. Для удобства чтения кода.
+    # Данные произведения потребуются далее. Для читабельности кода.
     min_prod = min1 * min2
     max_prod = max1 * max2
 
@@ -387,7 +399,7 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
         digits (Iterable[int]): Заданный список целых чисел.
 
     Returns:
-        tuple[int, list[int]]: Количество изменений и список возрастающих чисел.
+        tuple[int,list[int]]: Количество изменений и список возрастающих чисел.
     """
     # Значение, с которого начинается отсчет
     start = min(digits)
