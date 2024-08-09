@@ -431,6 +431,7 @@ def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
 
     Args:
         chars - Список символов.
+        with_separator - Добавлять символ-разделитель. Default: True
 
     Returns:
         str - Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
