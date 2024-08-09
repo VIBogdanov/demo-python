@@ -426,7 +426,7 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_word_palindrom(chars: str) -> str:
+def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
     """Из заданного набора символов сформировать палиндром.
 
     Args:
@@ -453,7 +453,9 @@ def get_word_palindrom(chars: str) -> str:
     half_palindrom: str = "".join(sorted(gwp(chars)))
     if len(half_palindrom):
         # Определяем символ-разделитель как лексикографически минимальный
-        midl_symbol: str = min(midl_candidate) if len(midl_candidate) else ""
+        midl_symbol: str = (
+            min(midl_candidate) if (len(midl_candidate) and with_separator) else ""
+        )
         # Собираем результирующий палиндром
         return "".join((half_palindrom, midl_symbol, half_palindrom[::-1]))
     return ""
@@ -492,7 +494,7 @@ def main():
     )
 
     print("\n- Из заданного набора символов формирует слово-палиндром.")
-    print(f" get_word_palindrom('bbaadcbb') -> {get_word_palindrom('bbaadcbb')}")
+    print(f" get_word_palindrom('bbaadcbb') -> {get_word_palindrome('bbaadcbb')}")
 
     print("\n")
 
