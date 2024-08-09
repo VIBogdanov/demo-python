@@ -443,10 +443,10 @@ def get_word_palindrom(chars: str) -> str:
         # Подсчитываем количество символов в заданном наборе и запускаем цикл их перебора
         for _char, _count in Counter(chrs).items():
             # Если количество символа нечетное, то это потенциальный символ-разделитель
-            if _count % 2:
+            if _count & 1:
                 midl_candidate.append(_char)
             # Возвращаем только символы, у которых количество пар одна и более
-            if pair_count := (_count // 2):
+            if pair_count := (_count >> 1):
                 yield str(_char * pair_count)
 
     # Формируем левую половину палиндрома
