@@ -436,7 +436,7 @@ def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
         str - Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
     """
     # Массив для аккумулирования кандидатов для символа-разделителя между половинами палиндрома
-    midl_candidate = array("u")
+    separator_candidate = array("u")
 
     # Внутренняя функция генератор для формирования символов, входящих в палиндром
     def gwp(chrs: str) -> Generator[str, Any, None]:
@@ -444,7 +444,7 @@ def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
         for _char, _count in Counter(chrs).items():
             # Если количество символа нечетное, то это потенциальный символ-разделитель
             if _count & 1:
-                midl_candidate.append(_char)
+                separator_candidate.append(_char)
             # Возвращаем только символы, у которых количество пар одна и более
             if pair_count := (_count >> 1):
                 yield str(_char * pair_count)
@@ -454,7 +454,9 @@ def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
     if len(half_palindrom):
         # Определяем символ-разделитель как лексикографически минимальный
         midl_symbol: str = (
-            min(midl_candidate) if (len(midl_candidate) and with_separator) else ""
+            min(separator_candidate)
+            if (len(separator_candidate) and with_separator)
+            else ""
         )
         # Собираем результирующий палиндром
         return "".join((half_palindrom, midl_symbol, half_palindrom[::-1]))
