@@ -1,9 +1,10 @@
+from array import array
 from collections import Counter, defaultdict, deque
 from collections.abc import Generator, Iterable, Iterator
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
-from typing import TypeAlias, TypeVar
+from typing import Any, TypeAlias, TypeVar
 
 from assistools import ilen
 
@@ -341,7 +342,8 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
     # Получаем итератор для однократного прохождения по элементам данных.
     # По производительности сравнимо с сортировкой, но при этом не модифицирует исходные данные.
     it_elements: Iterator[int] = iter(iterable)
-    # Инициализируем первым элементом исходных данных.
+
+    # Инициализируем первыми значениями исходных данных.
     try:
         min1 = max1 = next(it_elements)
     except StopIteration:
@@ -424,6 +426,40 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
 
 
 # -------------------------------------------------------------------------------------------------
+def get_word_palindrom(chars: str) -> str:
+    """Из заданного набора символов сформировать палиндром.
+
+    Args:
+        chars - Список символов.
+
+    Returns:
+        str - Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
+    """
+    # Массив для аккумулирования кандидатов для символа-разделителя между половинами палиндрома
+    midl_candidate = array("u")
+
+    # Внутренняя функция генератор для формирования символов, входящих в палиндром
+    def gwp(chrs: str) -> Generator[str, Any, None]:
+        # Подсчитываем количество символов в заданном наборе и запускаем цикл их перебора
+        for _char, _count in Counter(chrs).items():
+            # Если количество символа нечетное, то это потенциальный символ-разделитель
+            if _count % 2:
+                midl_candidate.append(_char)
+            # Возвращаем только символы, у которых количество пар одна и более
+            if pair_count := (_count // 2):
+                yield str(_char * pair_count)
+
+    # Формируем левую половину палиндрома
+    half_palindrom: str = "".join(sorted(gwp(chars)))
+    if len(half_palindrom):
+        # Определяем символ-разделитель как лексикографически минимальный
+        midl_symbol: str = min(midl_candidate) if len(midl_candidate) else ""
+        # Собираем результирующий палиндром
+        return "".join((half_palindrom, midl_symbol, half_palindrom[::-1]))
+    return ""
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
     print(
@@ -454,6 +490,11 @@ def main():
     print(
         f" get_incremental_list([1, 7, 3, 3]) -> {get_incremental_list([1, 7, 3, 3])}"
     )
+
+    print("\n- Из заданного набора символов формирует слово-палиндром.")
+    print(f" get_word_palindrom('bbaadcbb') -> {get_word_palindrom('bbaadcbb')}")
+
+    print("\n")
 
 
 if __name__ == "__main__":
