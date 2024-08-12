@@ -4,7 +4,7 @@ from collections.abc import Generator, Iterable, Iterator
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
-from typing import Any, TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar
 
 from assistools import ilen
 
@@ -301,6 +301,8 @@ def closest_amount(
                 sorted(current_numbers + [number]),
             )
             for number in numbers
+            # lambda использована исключительно в демонстрационных целях
+            # проще просто:  if number > 0 and (current_sum + number) <= target
             if (lambda _number: _number > 0 and (current_sum + _number) <= target)(
                 number
             )
@@ -339,7 +341,7 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
         tuple(min, max): Пара минимального и максимального значений произведения.
     """
     result: tuple[TIntNone, TIntNone] = (None, None)
-    # Получаем итератор для однократного прохождения по элементам данных.
+    # Получаем итератор для однократного прохода по элементам данных.
     # По производительности сравнимо с сортировкой, но при этом не модифицирует исходные данные.
     it_elements: Iterator[int] = iter(iterable)
 
@@ -426,7 +428,7 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
+def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) -> str:
     """Из заданного набора символов сформировать палиндром.
 
     Args:
@@ -436,31 +438,30 @@ def get_word_palindrome(chars: str, *, with_separator: bool = True) -> str:
     Returns:
         str - Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
     """
-    # Массив для аккумулирования кандидатов для символа-разделителя между половинами палиндрома
+    # Массив для аккумулирования кандидатов символов-разделителей между половинами палиндрома
     separator_candidate = array("u")
 
     # Внутренняя функция генератор для формирования символов, входящих в палиндром
-    def gwp(chrs: str) -> Generator[str, Any, None]:
+    # В параметре передаем итератор на строку, т.к. не собираемся менять строку и копия не нужна
+    def _get_palindrome_chars(chrs: Iterator[str]) -> Generator[str, None, None]:
         # Подсчитываем количество символов в заданном наборе и запускаем цикл их перебора
         for _char, _count in Counter(chrs).items():
             # Если количество символа нечетное, то это потенциальный символ-разделитель
-            if _count & 1:
+            if with_separator and (_count & 1):
                 separator_candidate.append(_char)
             # Возвращаем только символы, у которых количество пар одна и более
-            if pair_count := (_count >> 1):
-                yield str(_char * pair_count)
+            if _pair_count := (_count >> 1):
+                yield str(_char * _pair_count)
 
     # Формируем левую половину палиндрома
-    half_palindrom: str = "".join(sorted(gwp(chars)))
-    if len(half_palindrom):
+    half_palindrome: str = "".join(sorted(_get_palindrome_chars(iter(chars))))
+    if len(half_palindrome):
         # Определяем символ-разделитель как лексикографически минимальный
-        midl_symbol: str = (
-            min(separator_candidate)
-            if (len(separator_candidate) and with_separator)
-            else ""
+        separator_symbol: str = (
+            min(separator_candidate) if len(separator_candidate) else ""
         )
-        # Собираем результирующий палиндром
-        return "".join((half_palindrom, midl_symbol, half_palindrom[::-1]))
+        # Собираем результирующий палиндром. Join работает быстрее чем конкатенация
+        return "".join((half_palindrome, separator_symbol, half_palindrome[::-1]))
     return ""
 
 
@@ -498,8 +499,6 @@ def main():
 
     print("\n- Из заданного набора символов формирует слово-палиндром.")
     print(f" get_word_palindrom('bbaadcbb') -> {get_word_palindrome('bbaadcbb')}")
-
-    print("\n")
 
 
 if __name__ == "__main__":

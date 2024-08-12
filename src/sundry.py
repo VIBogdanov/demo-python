@@ -358,10 +358,9 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
         _elements: list = list(elements)
     except (ValueError, TypeError):
         return []
-
+    # Индексы первого и последнего элементов
     i_start: int = 0
     i_end: int = len(_elements) - 1
-
     # Флаг, исключающий "пустые" циклы, когда список достигает состояния "отсортирован" на одной из итераций
     is_swapped = False
 
@@ -661,8 +660,7 @@ def sort_by_shell(
 
     if (len(_elements)) > 1:
         # Создаем экземпляр класса, который будет генерировать диапазоны выборки
-        ranges_list = GetRangesSort(len(_elements), method)
-        for range_item in ranges_list:
+        for range_item in GetRangesSort(len(_elements), method):
             for i_range in range(range_item, len(_elements)):
                 i_current: int = i_range
                 while (i_current >= range_item) and (
@@ -813,6 +811,48 @@ def get_common_divisor(number_a: TInt, number_b: TInt) -> int | None:
 
 
 # --------------------------------------------------------------------------------------------
+def find_pairs_sum(
+    digits: Iterable[int],
+    target: int,
+) -> list[tuple[int, int]]:
+    """В заданном наборе чисел найти пары неповторяющихся чисел, сумму которых равна целевому значению.
+
+    Details:
+    Допускаются отрицательные, нулевые и повторяющиеся числа. Предварительная сортировка не требуется.
+
+    Args:
+        digits (Iterable[int]): Набор чисел
+        target (int): Целевое значение
+
+    Returns:
+        (list[tuple[int, int]]): Список пар чисел
+    """
+    result_list: list[tuple[int, int]] = list()
+    # Удаляем дубли и сортируем входной набор чисел
+    try:
+        digits_list: list[int] = sorted(set(digits))
+    except (ValueError, TypeError):
+        return result_list
+    # Задаем индексы первого и последнего числа списка
+    i_begin = 0
+    i_end: int = len(digits_list) - 1
+    # Запускаем цикл встречного перебора
+    while i_begin < i_end:
+        # Если сумму больше целевого значения, сдвигаем конечный индекс к началу списка
+        if (pair_sum := digits_list[i_begin] + digits_list[i_end]) > target:
+            i_end -= 1
+        # Найдена искомая сумма. Сохраняем пару слагаемых и сдвигаем конечный индекс к началу
+        elif pair_sum == target:
+            result_list.append((digits_list[i_begin], digits_list[i_end]))
+            i_end -= 1
+        # Если сумма меньше, наращиваем начальный индекс
+        else:
+            i_begin += 1
+
+    return result_list
+
+
+# --------------------------------------------------------------------------------------------
 def main():
     print(
         "\n- Функция нахождения наибольшего общего делителя двух целых чисел без перебора методом Евклида."
@@ -863,6 +903,13 @@ def main():
     print("\n- Сортировки методом выбора.")
     print(
         f" sort_by_selection([2, 7, 3, 1, 4, 5]) -> {sort_by_selection([2, 7, 3, 1, 4, 5])}"
+    )
+
+    print(
+        "\n- Поиск пары неповторяющихся чисел, сумма которых равна целевому значению."
+    )
+    print(
+        f" find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 6) -> {find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 6)}"
     )
 
 

@@ -137,8 +137,8 @@ def get_phrase(
                 phrase_combo_words.append(phrase_fix_words)
             else:  # иначе просто подгружаем тот список слов, который не пуст
                 phrase_combo_words.append(
-                    phrase_words
-                ) if phrase_words else phrase_combo_words.append(phrase_fix_words)
+                    phrase_words if phrase_words else phrase_fix_words
+                )
         case CompareType.Any:
             # Просто добавляем список всех слов поисковой фразы. Комбинировать не нужно
             phrase_combo_words.append(set(word.lower() for word in phrase_words_clear))
@@ -228,7 +228,7 @@ def main():
     CSV_NAME = r"requests.csv"
 
     IS_SAVETOEXCEL = False
-    IS_CHECKDATAFRAME = False
+    IS_CHECKDATAFRAME = True
 
     # Полный путь до csv-файла. В данном случае считается, что файл csv храниться
     # в подпапке data родительского каталога для текущего фала на один уровень выше.
