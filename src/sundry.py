@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import accumulate
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
-from assistools import get_positive_int
+from assistools import get_positive_int, is_int
 
 T = TypeVar("T")
 TNumber: TypeAlias = int | float | str
@@ -158,26 +158,27 @@ def _do_find_nearest(
 
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
-    try:
-        dig_list: list[int] = list(digits_list)
-    except (ValueError, TypeError):
-        return None
+    _digits_list: list[int] = list(filter(is_int, digits_list))
 
     i: int = current_index  # текущая позиция исходного числа, относительно которой ведется поиск
     for k in range(i - 1, -1, -1):  # просматриваем все цифры левее текущей позиции
         # сравниваем с текущей позицией, учитывая направление поиска
-        if (dig_list[k] > dig_list[i]) if previous else (dig_list[i] > dig_list[k]):
+        if (
+            (_digits_list[k] > _digits_list[i])
+            if previous
+            else (_digits_list[i] > _digits_list[k])
+        ):
             # в случае успешного сравнения, переставляем местами найденную цифру с текущей
-            dig_list[k], dig_list[i] = dig_list[i], dig_list[k]
+            _digits_list[k], _digits_list[i] = _digits_list[i], _digits_list[k]
             # если первая цифра полученного числа после перестановки не равна 0,
             # выполняем сортировку правой части числа
-            if dig_list[0] > 0:
+            if _digits_list[0] > 0:
                 k += 1  # правая часть числа начинается со сдвигом от найденной позиции
                 # сортируем правую часть числа (по возрастанию или по убыванию) с учетом направления поиска
-                dig_list[k::] = sorted(iter(dig_list[k::]), reverse=previous)
+                _digits_list[k::] = sorted(iter(_digits_list[k::]), reverse=previous)
                 # собираем из массива цифр результирующее число
                 return reduce(
-                    lambda dig_prev, dig_next: 10 * dig_prev + dig_next, dig_list
+                    lambda dig_prev, dig_next: 10 * dig_prev + dig_next, _digits_list
                 )
     return None
 
@@ -223,28 +224,21 @@ def find_item_by_binary(
 
     while i_first <= i_last and i_target is None:
         # Делим текущий остаток массива пополам
-        i_current: int = (i_first + i_last) // 2
+        i_middle: int = (i_first + i_last) >> 1
         try:
-            match (
-                elements[i_current],
-                target,
-            ):  # Сравниваем срединный элемент с искомым значением
-                # Смещаем начальный или конечный индексы в зависимости от результата сравнения
-                # текущего элемента с искомым значением и от направления сортировки
-                case (cur, trg) if cur > trg:
-                    i_first, i_last = (
-                        (i_first, i_current - 1)
-                        if is_forward
-                        else (i_current + 1, i_last)
-                    )
-                case (cur, trg) if cur < trg:
-                    i_first, i_last = (
-                        (i_current + 1, i_last)
-                        if is_forward
-                        else (i_first, i_current - 1)
-                    )
-                case _:  # В противном случае искомое значение найдено
-                    i_target = i_current
+            # Сравниваем срединный элемент с искомым значением
+            # Смещаем начальный или конечный индексы в зависимости
+            # от результата сравнения и от направления сортировки
+            if elements[i_middle] == target:
+                i_target = i_middle
+            elif elements[i_middle] > target:
+                i_first, i_last = (
+                    (i_first, i_middle - 1) if is_forward else (i_middle + 1, i_last)
+                )
+            else:
+                i_first, i_last = (
+                    (i_middle + 1, i_last) if is_forward else (i_first, i_middle - 1)
+                )
         # Обрабатываем исключение в случае невозможности сравнить искомое значение с элементом массива
         except (ValueError, TypeError):
             return None
@@ -811,9 +805,13 @@ def get_common_divisor(number_a: TInt, number_b: TInt) -> int | None:
 
 
 # --------------------------------------------------------------------------------------------
+Tdigit = TypeVar("Tdigit", int, float, str, bytes)
+Ttarget = TypeVar("Ttarget", int, float, str, bytes)
+
+
 def find_pairs_sum(
-    digits: Iterable[int],
-    target: int,
+    digits: Iterable[Tdigit],
+    target: Ttarget,
 ) -> list[tuple[int, int]]:
     """В заданном наборе чисел найти неповторяющиеся пары чисел, сумма которых равна целевому значению.
 
@@ -829,20 +827,23 @@ def find_pairs_sum(
     """
     result_list: list[tuple[int, int]] = list()
     # Удаляем дубли и сортируем входной набор чисел. Сортировка обязательна
+    digits_list: list[int] = sorted(set(int(i) for i in filter(is_int, digits)))
+    # Приводим входные параметры к единому типу int
     try:
-        digits_list: list[int] = sorted(set(digits))
+        _target: int = int(target)
     except (ValueError, TypeError):
         return result_list
+
     # Задаем индексы первого и последнего числа списка
     i_begin = 0
     i_end: int = len(digits_list) - 1
     # Запускаем цикл встречного перебора
     while i_begin <= i_end:
         # Если сумма больше целевого значения, сдвигаем конечный индекс к началу списка
-        if (pair_sum := digits_list[i_begin] + digits_list[i_end]) > target:
+        if (pair_sum := digits_list[i_begin] + digits_list[i_end]) > _target:
             i_end -= 1
         # Найдена искомая сумма. Сохраняем пару слагаемых и сдвигаем конечный индекс к началу
-        elif pair_sum == target:
+        elif pair_sum == _target:
             result_list.append((digits_list[i_begin], digits_list[i_end]))
             i_end -= 1
         # Если сумма меньше, наращиваем начальный индекс
@@ -907,7 +908,7 @@ def main():
 
     print("\n- Поиск неповторяющихся пар чисел, сумма которых равна целевому значению.")
     print(
-        f" find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5)}"
+        f" find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], '5')}"
     )
 
 
