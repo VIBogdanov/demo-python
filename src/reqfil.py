@@ -26,7 +26,8 @@ from typing import NamedTuple
 
 from pandas import DataFrame, ExcelWriter
 
-STRIP_TEMPL = ' .,:;"!?-=()[]'
+STRIP_TEMPL = r"""_ .,:;"'!?-=()[]{}\|/"""
+BUFFER_SIZE = 1024 * 100
 
 
 # Перечисление методов сравнения поисковой фразы с запросом
@@ -68,7 +69,7 @@ def get_request(csv_filename: str | Path) -> Generator[Request, None, None]:
         содержащей запрос, количество и список слов
     """
     with open(
-        csv_filename, encoding="utf-8-sig", mode="rt", buffering=102400
+        csv_filename, encoding="utf-8-sig", mode="rt", buffering=BUFFER_SIZE
     ) as csv_file:
         for line in csv_file:
             # пытаемся выделить из строки текст запроса и его количество
@@ -228,7 +229,7 @@ def main():
     CSV_NAME = r"requests.csv"
 
     IS_SAVETOEXCEL = False
-    IS_CHECKDATAFRAME = True
+    IS_SHOWDATAFRAME = True
 
     # Полный путь до csv-файла. В данном случае считается, что файл csv храниться
     # в подпапке data родительского каталога для текущего фала на один уровень выше.
@@ -236,7 +237,7 @@ def main():
     # то csv файл должен быть расположен в папке /samefolders/data/requests.csv
     # Чтобы работать в текущей папке: csv_filename = Path(Path(__file__), CSV_NAME)
     csv_filename = Path(Path(__file__).parents[1], DIR_NAME, CSV_NAME)
-    # Файл Excel сохраняем рядом в той же папке с тем же именем
+    # Файл Excel сохраняем рядом с csv в той же папке с тем же именем
     exel_filename = csv_filename.with_suffix(".xlsx")
 
     # определяем функцию сравнения запросов с поисковой фразой
@@ -252,7 +253,7 @@ def main():
         # Т.к. генератор возвращает именованную структуру NamedTuple похожую на DataClass,
         # то возможно создание DataFrame без промежуточного словаря прямо из генератора
         dfr = DataFrame(requests_generator)
-        if IS_CHECKDATAFRAME:
+        if IS_SHOWDATAFRAME:
             if len(dfr) > 0:
                 print(dfr[["request", "quantity", "words"]])
             else:

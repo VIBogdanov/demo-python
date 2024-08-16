@@ -1,8 +1,10 @@
-from collections import Counter, deque
+from collections import Counter, OrderedDict, deque
 from collections.abc import Iterable, Iterator, Sequence
+from functools import wraps
+from inspect import BoundArguments, Signature, signature
 from itertools import count
 from multiprocessing import Pool, cpu_count
-from typing import Any, NamedTuple, TypeAlias, TypeVar
+from typing import Any, NamedTuple, SupportsInt, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 TAny = TypeVar("TAny")
@@ -10,6 +12,60 @@ T = TypeVar("T")
 NumberStrNone: TypeAlias = int | float | str | None
 
 
+# ---------------------Decorators-------------------------------------------------------
+def type_checking(*type_args, **type_kwargs):
+    """Декоратор, позволяющий выполнять проверку типов аргументов, передаваемых в функцию.
+    Требование проверки типов можно задавать как для всех аргументов, так и выборочно.
+    Требуемые типы сопоставляются с аргументами либо попозиционно, либо как ключ-значение.
+    Требуемый тип задается либо как отдельное значение, либо как кортеж типов.
+
+    Examples:
+    @typeassert(int, (int, str), z=float)
+    def samefunction(x, y, z=4.5)
+
+    @typeassert(y = (int, str), x = int)
+    def samefunction(x, y, z=4.5)
+
+    - samefunction(1, 3, z=123.5)   #OK
+    - samefunction(1, '3', z=123.5)   #OK
+    - samefunction(1, 3)   #OK
+    - samefunction('1', 3, z=123.5)   #Error
+    - samefunction(1, 3, z=123)   #Error
+    - samefunction(1, 3.4)   #Error
+    """
+
+    def decorate(func):
+        # В режиме оптимизации отключаем декоратор
+        if not __debug__:
+            return func
+        # Формируем словарь, связывающий арнументы функции с типами, заданными в декораторе
+        func_signature: Signature = signature(func)
+        link_types: OrderedDict[str, Any] = func_signature.bind_partial(
+            *type_args, **type_kwargs
+        ).arguments
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Формируем словарь с именами преданных функции аргументов и их значениями
+            for arg_name, arg_value in func_signature.bind(
+                *args, **kwargs
+            ).arguments.items():
+                # Если для данного аргумента задана проверка типа
+                if arg_name in link_types:
+                    # Если тип значения аргумента не соответствует заданному в декораторе
+                    if not isinstance(arg_value, link_types[arg_name]):
+                        raise TypeError(
+                            f"Argument '{arg_name}' must be {link_types[arg_name]}"
+                        )
+            # Проверка типов пройдена успешно. Вызываем оригинальную функцию
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorate
+
+
+# --------------------------------------------------------------------------------------
 def is_even(n: int) -> bool:
     """
     Крайне простой алгоритм проверки целого числа на четность.
@@ -25,7 +81,11 @@ def is_even(n: int) -> bool:
     return not n & 1
 
 
-def get_positive_int(value: NumberStrNone) -> int:
+# --------------------------------------------------------------------------------------
+Tintvalue = TypeVar("Tintvalue", bound=SupportsInt)
+
+
+def get_positive_int(value: Tintvalue) -> int:
     """
     Проверяет значение на положительное целое.
     Если переданное значение невозможно представить как целое число,
@@ -53,6 +113,7 @@ class RangeIndex(NamedTuple):
     end: int
 
 
+# --------------------------------------------------------------------------------------
 def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
     """
     Функция-генератор, формирующая список индексов диапазонов заданной длины,
@@ -86,6 +147,7 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
             )
 
 
+# --------------------------------------------------------------------------------------
 def _is_srt(args: tuple[Iterator, bool]) -> bool:
     """
     Вспомогательная функция, поэлементно проверяющая отсортирован ли исходный список
@@ -114,6 +176,7 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
     return True
 
 
+# --------------------------------------------------------------------------------------
 def is_sorted(
     elements: Sequence[TAny],
     *,
@@ -137,7 +200,7 @@ def is_sorted(
         bool: True, если список отсортирован.
     """
     # Пустые списки или списки из одного элемента всегда отсортированы
-    if (ln := len(elements)) < 2:
+    if (len_elements := len(elements)) < 2:
         return True
 
     cpu: int = cpu_count()
@@ -145,9 +208,11 @@ def is_sorted(
 
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
     if (range_size := get_positive_int(rangesize)) == 0:
-        range_size = cpu * max(round(ln**0.5), CPU_FREQUENCY)
+        range_size = cpu * max(round(len_elements**0.5), CPU_FREQUENCY)
 
-    ranges_count: int = ln // range_size + int(bool(ln % range_size))
+    ranges_count: int = len_elements // range_size + int(
+        bool(len_elements % range_size)
+    )
 
     # Если исходный список можно разделить хотя бы на 2 подсписка
     # запускаем многозадачную обработку
@@ -159,8 +224,8 @@ def is_sorted(
         # Например: [1,2,4,3,5,6]. Если разделить пополам, то оба подсписка будут отсортированы,
         # но при этом исходный полный список не отсортирован.
         margs_list = (
-            (iter(elements[i_start : (i_end + int(i_end < ln))]), revers)  # noqa: E203
-            for i_start, i_end in get_ranges_index(ln, range_size)
+            (iter(elements[i_start : (i_end + int(i_end < len_elements))]), revers)  # noqa: E203
+            for i_start, i_end in get_ranges_index(len_elements, range_size)
         )
 
         # Запускаем пул параллельных процессов для проверки сортировки набора диапазонов
@@ -246,7 +311,7 @@ def is_includes_elements(data: Iterable[Any], pattern: Iterable[Any]) -> bool:
 
 
 # -------------------------------------------------------------------------------------------------
-def ilen(iterable: Iterable[T]) -> int:
+def ilen(iterable: Iterable[Any]) -> int:
     """
     Подсчитывает количество элементов в итераторе. Попытка достичь компромиса между
     скоростью и потреблением памяти.
@@ -263,12 +328,12 @@ def ilen(iterable: Iterable[T]) -> int:
     if hasattr(iterable, "__len__"):
         return len(iterable)
     # Бесконечный счетчик-итератор
-    _counter = count()
-    # Создаем очередь нулевой длины. Используется только для инкреминтирования счетчика _counter.
-    # Очередь никаких данных не хранит.
-    deque(zip(iterable, _counter), 0)
+    iter_counter = count()
+    # Создаем очередь нулевой длины, которая используется только для инкреминтирования
+    # счетчика iter_counter, и никаких данных не хранит.
+    deque(zip(iterable, iter_counter), 0)
     # Возвращаем значение счетчика
-    return next(_counter)
+    return next(iter_counter)
 
 
 # -------------------------------------------------------------------------------------------------

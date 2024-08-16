@@ -3,9 +3,9 @@ from collections.abc import Collection, Iterable, Iterator
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
-from typing import Any, NamedTuple, TypeAlias, TypeVar
+from typing import Any, NamedTuple, SupportsInt, TypeAlias, TypeVar
 
-from assistools import get_positive_int, is_int
+from assistools import get_positive_int, is_int, type_checking
 
 T = TypeVar("T")
 TNumber: TypeAlias = int | float | str
@@ -766,7 +766,11 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
 
 # -------------------------------------------------------------------------------------------------
-def get_common_divisor(number_a: TInt, number_b: TInt) -> int | None:
+TNumber = TypeVar("TNumber", int, str, bytes)
+
+
+@type_checking(TNumber.__constraints__, TNumber.__constraints__)
+def get_common_divisor(number_a: TNumber, number_b: TNumber) -> int | None:
     """
     Алгоритм нахождения наибольшего общего делителя двух целых чисел без перебора.
     Используется метод Евклида. Например, для чисел 20 и 12:
@@ -805,22 +809,21 @@ def get_common_divisor(number_a: TInt, number_b: TInt) -> int | None:
 
 
 # --------------------------------------------------------------------------------------------
-Tdigit = TypeVar("Tdigit", int, float, str, bytes)
-Ttarget = TypeVar("Ttarget", int, float, str, bytes)
+TDigit = TypeVar("TDigit", int, str, bytes)
 
 
 def find_pairs_sum(
-    digits: Iterable[Tdigit],
-    target: Ttarget,
+    digits: Iterable[TDigit],
+    target: TDigit,
 ) -> list[tuple[int, int]]:
-    """В заданном наборе чисел найти неповторяющиеся пары чисел, сумма которых равна целевому значению.
+    """В заданном наборе чисел найти неповторяющиеся пары целых чисел, сумма которых равна целевому значению.
 
     Details:
     Допускаются отрицательные, нулевые и повторяющиеся числа. Предварительная сортировка не требуется.
 
     Args:
-        digits (Iterable[int]): Набор чисел
-        target (int): Целевое значение
+        digits (Iterable): Набор чисел
+        target: Целевое значение
 
     Returns:
         (list[tuple[int, int]]): Список пар
@@ -908,7 +911,7 @@ def main():
 
     print("\n- Поиск неповторяющихся пар чисел, сумма которых равна целевому значению.")
     print(
-        f" find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], '5')}"
+        f" find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5)}"
     )
 
 
