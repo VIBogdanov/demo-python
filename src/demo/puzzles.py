@@ -6,7 +6,9 @@ from itertools import chain, groupby, permutations
 from math import prod
 from typing import TypeAlias, TypeVar
 
-from assistools import ilen
+# Должно быть так: from .assistools import ilen
+# Но это ограничивает независимый запуск файла py из модуля
+from demo import ilen
 
 T = TypeVar("T")
 TIntNone: TypeAlias = int | None

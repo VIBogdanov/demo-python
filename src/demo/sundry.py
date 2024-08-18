@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import accumulate
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
-from assistools import get_positive_int, is_int, type_checking
+from demo import get_positive_int, is_int, type_checking
 
 T = TypeVar("T")
 TNumber: TypeAlias = int | float | str
