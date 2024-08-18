@@ -4,7 +4,7 @@ from functools import wraps
 from inspect import Signature, signature
 from itertools import count
 from multiprocessing import Pool, cpu_count
-from typing import Any, NamedTuple, SupportsInt, TypeAlias, TypeVar
+from typing import Any, SupportsInt, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 TAny = TypeVar("TAny")
@@ -105,15 +105,10 @@ def get_positive_int(value: TIntValue) -> int:
     return abs(result)
 
 
-class RangeIndex(NamedTuple):
-    start: int
-    end: int
-
-
 # --------------------------------------------------------------------------------------
 def get_ranges_index(
     list_len: int, range_len: int
-) -> Generator[RangeIndex, None, None]:
+) -> Generator[tuple[int, int], None, None]:
     """
     Функция-генератор, формирующая список индексов диапазонов заданной длины,
     на которые можно разбить исходный список длиной list_len.
@@ -124,7 +119,7 @@ def get_ranges_index(
         range_len (int): Размер диапазона.
 
     Yields:
-        Iterator[RangeIndex]: Возвращает кортеж с начальным и конечным индексами диапазона.
+        (start, end): Возвращает кортеж с начальным и конечным индексами диапазона.
     """
     # Корректируем возможные ошибки во входных параметрах
     _list_len: int = get_positive_int(list_len)
@@ -136,12 +131,10 @@ def get_ranges_index(
             (_range_len < 1),
         )
     ):
-        yield RangeIndex(0, _list_len)
+        yield (0, _list_len)
     else:
         for i in range(0, _list_len, _range_len):
-            yield RangeIndex(
-                i, re if (re := (i + _range_len)) < _list_len else _list_len
-            )
+            yield (i, re if (re := (i + _range_len)) < _list_len else _list_len)
 
 
 # --------------------------------------------------------------------------------------
@@ -232,12 +225,12 @@ def is_sorted(
     if ranges_count > 1:
         # Разбиваем исходный список на диапазоны и проверяем каждый диапазон в отдельном процессе.
         # Для каждого диапазона (кроме последнего) сравниваем последний элемент с первым элементом
-        # следующего диапазона, для чего увеличиваем конечный индекс диапазона на 1.
+        # следующего диапазона, для чего смещаем конечный индекс диапазона на 1.
         # Возможна ситуация, когда два отдельный подсписка отсортированы, но целый список нет
         # Например: [1,2,4,3,5,6]. Если разделить пополам, то оба подсписка будут отсортированы,
         # но при этом исходный полный список не отсортирован.
         margs_list = (
-            (iter(elements[i_start : (i_end + int(i_end < len_elements))]), revers)  # noqa: E203
+            (iter(elements[i_start : i_end + int(i_end < len_elements)]), revers)
             for i_start, i_end in get_ranges_index(len_elements, range_size)
         )
 
