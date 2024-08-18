@@ -1,7 +1,7 @@
 from collections import Counter, OrderedDict, deque
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from functools import wraps
-from inspect import BoundArguments, Signature, signature
+from inspect import Signature, signature
 from itertools import count
 from multiprocessing import Pool, cpu_count
 from typing import Any, NamedTuple, SupportsInt, TypeAlias, TypeVar
@@ -82,10 +82,10 @@ def is_even(n: int) -> bool:
 
 
 # --------------------------------------------------------------------------------------
-Tintvalue = TypeVar("Tintvalue", bound=SupportsInt)
+TIntValue = TypeVar("Tintvalue", bound=SupportsInt)
 
 
-def get_positive_int(value: Tintvalue) -> int:
+def get_positive_int(value: TIntValue) -> int:
     """
     Проверяет значение на положительное целое.
     Если переданное значение невозможно представить как целое число,
@@ -97,9 +97,6 @@ def get_positive_int(value: Tintvalue) -> int:
     Returns:
         int: Возвращает целое положительное число
     """
-    if value is None:
-        return 0
-
     try:
         result: int = int(value)
     except (ValueError, TypeError):
@@ -114,7 +111,9 @@ class RangeIndex(NamedTuple):
 
 
 # --------------------------------------------------------------------------------------
-def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
+def get_ranges_index(
+    list_len: int, range_len: int
+) -> Generator[RangeIndex, None, None]:
     """
     Функция-генератор, формирующая список индексов диапазонов заданной длины,
     на которые можно разбить исходный список длиной list_len.
@@ -140,10 +139,8 @@ def get_ranges_index(list_len: int, range_len: int) -> Iterator[RangeIndex]:
         yield RangeIndex(0, _list_len)
     else:
         for i in range(0, _list_len, _range_len):
-            yield (
-                RangeIndex(i, i + _range_len)
-                if (i + _range_len) < _list_len
-                else RangeIndex(i, _list_len)
+            yield RangeIndex(
+                i, re if (re := (i + _range_len)) < _list_len else _list_len
             )
 
 
@@ -168,10 +165,26 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
     except StopIteration:
         return True
 
+    """
+    Можно было использовать более компактный вариант:
     for _next in elements:
         if (_prev < _next) if is_revers else (_next < _prev):
             return False
         _prev = _next
+
+    Но match работает немного быстрее
+    """
+    match is_revers:
+        case True:
+            for _next in elements:
+                if _prev < _next:
+                    return False
+                _prev = _next
+        case False:
+            for _next in elements:
+                if _next < _prev:
+                    return False
+                _prev = _next
 
     return True
 

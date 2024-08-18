@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable, Iterator
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
-from typing import Any, NamedTuple, SupportsInt, TypeAlias, TypeVar
+from typing import Any, NamedTuple, TypeAlias, TypeVar
 
 from assistools import get_positive_int, is_int, type_checking
 
@@ -829,7 +829,7 @@ def find_pairs_sum(
         (list[tuple[int, int]]): Список пар
     """
     result_list: list[tuple[int, int]] = list()
-    # Удаляем дубли и сортируем входной набор чисел. Сортировка обязательна
+    # Удаляем дубли и сортируем входной набор чисел. Сортировка обязательна!!!
     digits_list: list[int] = sorted(set(int(i) for i in filter(is_int, digits)))
     # Приводим входные параметры к единому типу int
     try:
