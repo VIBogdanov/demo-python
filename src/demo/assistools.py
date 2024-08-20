@@ -361,11 +361,20 @@ class Timer:
     и накопление отключено.
     """
 
+    __slots__ = (
+        "__elapsed_time",
+        "__time_source",
+        "__start_time",
+        "__accumulate",
+        "__dict__",
+        "__weakref__",
+    )
+
     def __init__(self, time_source=perf_counter, is_accumulate: bool = False) -> None:
-        self._elapsed_time: float = 0.0
-        self._time_source = time_source
-        self._start_time = None
-        self._accumulate: bool = is_accumulate
+        self.__elapsed_time: float = 0.0
+        self.__time_source = time_source
+        self.__start_time = None
+        self.__accumulate: bool = is_accumulate
 
     # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
     # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
@@ -377,7 +386,7 @@ class Timer:
             # Для декоратора используем свои собственные временные метки start и elapsed.
             # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
             # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
-            start_time = self._time_source()
+            start_time = self.__time_source()
             try:
                 result = func(*args, **kwargs)
             except Exception as exc:
@@ -388,59 +397,65 @@ class Timer:
                 # При измерении интервала времени для декоратора аккумулирование не используется.
                 # Для декоратора накопление не имеет смысла, т.к. измеряется конкретная функция
                 # в конкретный момент ее вызова
-                print(
-                    f"{func.__module__}.{func.__name__} : {self._time_source() - start_time}"
-                )
+                # Тонкий момент: можно было бы встроить вычисление elapsed_time прямо в строку форматирование
+                # оператора print, но тогда в измерение интервала времени было бы внесено искажение,
+                # связанное c затратами на формирования отформатированной строки для оператора print
+                elapsed_time = self.__time_source() - start_time
+                print(f"{func.__module__}.{func.__name__} : {elapsed_time}")
             return result
 
         return _wrapper
 
+    def __repr__(self) -> str:
+        _cls: str = self.__class__.__name__
+        return f"{_cls}(time_source={self.__time_source!r}, is_accumulate={self.__accumulate!r})"
+
     def start(self) -> None:
-        if self._start_time is not None:
-            raise RuntimeError("Already started")
-        self._start_time = self._time_source()
+        if self.__start_time is not None:
+            raise RuntimeError("Timer already started")
+        self.__start_time = self.__time_source()
 
     def stop(self) -> float:
-        if self._start_time is None:
-            raise RuntimeError("Not started")
-        if self._accumulate:
-            self._elapsed_time += self._time_source() - self._start_time
+        if self.__start_time is None:
+            raise RuntimeError("Timer not started")
+        if self.__accumulate:
+            self.__elapsed_time += self.__time_source() - self.__start_time
         else:
-            self._elapsed_time = self._time_source() - self._start_time
-        self._start_time = None
-        return self._elapsed_time
+            self.__elapsed_time = self.__time_source() - self.__start_time
+        self.__start_time = None
+        return self.__elapsed_time
 
     def reset(self) -> None:
-        self._elapsed_time = 0.0
-        self._start_time = None
+        self.__elapsed_time = 0.0
+        self.__start_time = None
 
     @property
     def time_sourse(self):
-        return self._time_source
+        return self.__time_source
 
     @time_sourse.setter
     def time_sourse(self, func) -> None:
-        self._time_source = func
+        self.__time_source = func
 
     @property
     def accumulate(self) -> bool:
-        return self._accumulate
+        return self.__accumulate
 
     @accumulate.setter
     def accumulate(self, value: bool) -> None:
-        self._accumulate = value
+        self.__accumulate = value
 
     # Признак работающего таймера
     @property
     def is_running(self) -> bool:
-        return self._start_time is not None
+        return self.__start_time is not None
 
     # Измеренное время между start() и stop()
     @property
     def elapsed(self) -> float:
-        if self._start_time is not None:
+        if self.__start_time is not None:
             raise RuntimeError("Timer not stopped")
-        return self._elapsed_time
+        return self.__elapsed_time
 
     # Для поддержки протокола менеджера контента, реализованы методы __enter__ и __exit__
     def __enter__(self) -> Self:
