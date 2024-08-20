@@ -4,7 +4,8 @@ from functools import wraps
 from inspect import Signature, signature
 from itertools import count
 from multiprocessing import Pool, cpu_count
-from typing import Any, SupportsInt, TypeAlias, TypeVar
+from time import perf_counter
+from typing import Any, Self, SupportsInt, TypeAlias, TypeVar
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 TAny = TypeVar("TAny")
@@ -352,6 +353,78 @@ def is_int(val: Any) -> bool:
 
 
 # -------------------------------------------------------------------------------------------------
+class Timer:
+    """Класс-таймер, с помощью которого замеряется время выполнения кода.
+    Поддерживает как ручной запуск и останов: start()/stop(),
+    так и как менеджер контента 'with'.
+    При инициализации или в процессе использования задаются функция источник времени и
+    признак накопления измеренных интервалов. По умолчанию используется time.perf_counter
+    и накопление отключено.
+    """
+
+    def __init__(self, time_source=perf_counter, is_accumulate: bool = False) -> None:
+        self._elapsed_time: float = 0.0
+        self._time_source = time_source
+        self._start_time = None
+        self._accumulate: bool = is_accumulate
+
+    def start(self) -> None:
+        if self._start_time is not None:
+            raise RuntimeError("Already started")
+        self._start_time = self._time_source()
+
+    def stop(self) -> float:
+        if self._start_time is None:
+            raise RuntimeError("Not started")
+        if self._accumulate:
+            self._elapsed_time += self._time_source() - self._start_time
+        else:
+            self._elapsed_time = self._time_source() - self._start_time
+        self._start_time = None
+        return self._elapsed_time
+
+    def reset(self) -> None:
+        self._elapsed_time = 0.0
+        self._start_time = None
+
+    @property
+    def time_sourse(self):
+        return self._time_source
+
+    @time_sourse.setter
+    def time_sourse(self, func) -> None:
+        self._time_source = func
+
+    @property
+    def accumulate(self) -> bool:
+        return self._accumulate
+
+    @accumulate.setter
+    def accumulate(self, value: bool) -> None:
+        self._accumulate = value
+
+    # Признак работающего таймера
+    @property
+    def is_running(self) -> bool:
+        return self._start_time is not None
+
+    # Измеренное время
+    @property
+    def elapsed(self) -> float:
+        if self._start_time is not None:
+            raise RuntimeError("Timer not stopped")
+        return self._elapsed_time
+
+    # Для поддержки протокола менеджера контента, реализованы методы __enter__ и __exit__
+    def __enter__(self) -> Self:
+        self.start()
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.stop()
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print(
         "\n- Формирует список индексов диапазонов, на которые можно разбить список заданной длины."
@@ -368,11 +441,10 @@ def main():
 
 # -------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    from time import time
-
     data = range(100_000_000)
-    start = time()
-    res = is_sorted(data)
-    print(f"Общее время выполнения is_sorted({res}):", time() - start)
+
+    with Timer() as tm:
+        res = is_sorted(data)
+    print(f"Общее время выполнения is_sorted({res}):", tm.elapsed)
 
     main()
