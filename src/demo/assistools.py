@@ -367,6 +367,34 @@ class Timer:
         self._start_time = None
         self._accumulate: bool = is_accumulate
 
+    # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
+    # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
+    # Возможно задать и параметр is_accumulate, но он будет проигнорирован
+    def __call__(self, func):
+        @wraps(func)
+        def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            result: Any = None
+            # Для декоратора используем свои собственные временные метки start и elapsed.
+            # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
+            # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
+            start_time = self._time_source()
+            try:
+                result = func(*args, **kwargs)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Call error {func.__module__}.{func.__name__}"
+                ) from exc
+            else:
+                # При измерении интервала времени для декоратора аккумулирование не используется.
+                # Для декоратора накопление не имеет смысла, т.к. измеряется конкретная функция
+                # в конкретный момент ее вызова
+                print(
+                    f"{func.__module__}.{func.__name__} : {self._time_source() - start_time}"
+                )
+            return result
+
+        return _wrapper
+
     def start(self) -> None:
         if self._start_time is not None:
             raise RuntimeError("Already started")
