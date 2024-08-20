@@ -485,7 +485,7 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
         query_work: deque = deque()
         # Инициализируем буферную очередь исходным списком, деленным пополам
         query_buff.append(MergeRanges(0, (_ln // 2), _ln))
-        # Далее делим пополам обе половины до тех пор, пока в каждой половине не останется по одному элементу
+        # Далее делим пополам обе половины до тех пор, пока в каждой половине не останется по два элемента
         while query_buff:
             i_first, i_middle, i_last = query_buff.popleft()
             # Делим пополам левую часть

@@ -225,18 +225,18 @@ def main():
     MIN_QUANTITY: int = 1  # Позволяет отфильтровать малочисленные запросы.
     COMPARE_TYPE = CompareType.Full
 
-    DIR_NAME = r"data"
+    DIR_NAME = r"../data"
     CSV_NAME = r"requests.csv"
 
     IS_SAVETOEXCEL = False
     IS_SHOWDATAFRAME = True
 
     # Полный путь до csv-файла. В данном случае считается, что файл csv храниться
-    # в подпапке data родительского каталога для текущего фала на один уровень выше.
+    # в подпапке 'data' родительского каталога для текущего фала на один уровень выше.
     # Например: если текущий файл хранится в папке /samefolders/src/reqfil.py,
     # то csv файл должен быть расположен в папке /samefolders/data/requests.csv
-    # Чтобы работать в текущей папке: csv_filename = Path(Path(__file__), CSV_NAME)
-    csv_filename = Path(Path(__file__).parents[1], DIR_NAME, CSV_NAME)
+    # Чтобы работать в текущей папке: DIR_NAME = r""
+    csv_filename = Path(Path(__file__).parent, DIR_NAME, CSV_NAME).resolve()
     # Файл Excel сохраняем рядом с csv в той же папке с тем же именем
     exel_filename = csv_filename.with_suffix(".xlsx")
 

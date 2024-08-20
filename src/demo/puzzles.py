@@ -7,7 +7,7 @@ from math import prod
 from typing import TypeAlias, TypeVar
 
 # Должно быть так: from .assistools import ilen
-# Но это ограничивает независимый запуск файла py из модуля
+# Но это ограничивает независимый запуск файла py, который в составе модуля
 from demo import ilen
 
 T = TypeVar("T")
