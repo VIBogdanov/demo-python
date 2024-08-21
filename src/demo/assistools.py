@@ -41,7 +41,7 @@ def type_checking(*type_args, **type_kwargs):
             return func
         # Формируем словарь, связывающий арнументы функции с типами, заданными в декораторе
         func_signature: Signature = signature(func)
-        link_types: OrderedDict[str, Any] = func_signature.bind_partial(
+        args_types: OrderedDict[str, Any] = func_signature.bind_partial(
             *type_args, **type_kwargs
         ).arguments
 
@@ -52,11 +52,11 @@ def type_checking(*type_args, **type_kwargs):
                 *args, **kwargs
             ).arguments.items():
                 # Если для данного аргумента задана проверка типа
-                if arg_name in link_types:
+                if arg_name in args_types:
                     # Если тип значения аргумента не соответствует заданному в декораторе
-                    if not isinstance(arg_value, link_types[arg_name]):
+                    if not isinstance(arg_value, args_types[arg_name]):
                         raise TypeError(
-                            f"Argument '{arg_name}' must be {link_types[arg_name]}"
+                            f"Argument '{arg_name}' must be {args_types[arg_name]}"
                         )
             # Проверка типов пройдена успешно. Вызываем оригинальную функцию
             return func(*args, **kwargs)
@@ -401,7 +401,15 @@ class Timer:
                 # оператора print, но тогда в измерение интервала времени было бы внесено искажение,
                 # связанное c затратами на формирования отформатированной строки для оператора print
                 elapsed_time = self.__time_source() - start_time
-                print(f"{func.__module__}.{func.__name__} : {elapsed_time}")
+                parameters = ", ".join(
+                    f"{arg_name}={arg_value}"
+                    for arg_name, arg_value in signature(func)
+                    .bind(*args, **kwargs)
+                    .arguments.items()
+                )
+                print(
+                    f"{func.__module__}.{func.__name__}({parameters}) : {elapsed_time}"
+                )
             return result
 
         return _wrapper
@@ -443,7 +451,10 @@ class Timer:
 
     @accumulate.setter
     def accumulate(self, value: bool) -> None:
-        self.__accumulate = value
+        try:
+            self.__accumulate = bool(value)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("Accumulate must be bool.") from exc
 
     # Признак работающего таймера
     @property
