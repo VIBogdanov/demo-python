@@ -537,14 +537,7 @@ def rinda_multiplication(a: int, b: int) -> int:
             a >>= 1
             b <<= 1
 
-    # Отрабатываем пороговые случаи или возвращаем результат
-    match a:
-        case 0:
-            return 0
-        case 1:
-            return sign * b
-        case _:
-            return sign * sum(_get_addendum(a, b))
+    return sign * sum(_get_addendum(a, b))
 
 
 # -------------------------------------------------------------------------------------------------

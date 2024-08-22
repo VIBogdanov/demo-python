@@ -456,7 +456,7 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     Усовершенствованная версия функции сортировки методом слияния (см. sort_by_merge). В отличии
     от оригинальной версии не использует рекурсивные вызовы и не создает каскад списков.
     Вместо этого создается список индексов для диапазонов сортировки, по которым происходит отбор
-    значений из списка источника и сортировка по месту.
+    значений из списка источника для сортировки.
 
     Args:
         elements (Iterable[T]): Список данных для сортировки.
@@ -468,34 +468,35 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     """
 
     # Вспомогательный именованный кортеж
-    class MergeRanges(NamedTuple):
+    class IndexRange(NamedTuple):
         first_index: int
         middle_index: int
         last_index: int
 
     # Создаем копию списка, на котором будем производить сортировку. Он же будет результирующим.
+    # Копия нужна, т.к. мы не знаем что будет на входе, например, если это итератор или генератор.
     try:
         _elements: list[T] = list(elements)
-    except (ValueError, TypeError):
-        return []
+    except Exception as exc:
+        raise RuntimeError("Input data must be convertible into a list.") from exc
 
     if (_ln := len(_elements)) > 1:
         # Очереди для создания списка индексов.
         query_buff: deque = deque()
         query_work: deque = deque()
         # Инициализируем буферную очередь исходным списком, деленным пополам
-        query_buff.append(MergeRanges(0, (_ln // 2), _ln))
+        query_buff.append(IndexRange(0, (_ln // 2), _ln))
         # Далее делим пополам обе половины до тех пор, пока в каждой половине не останется по два элемента
         while query_buff:
             i_first, i_middle, i_last = query_buff.popleft()
             # Делим пополам левую часть
             if (_md := (i_middle - i_first) // 2) > 0:
-                query_buff.append(MergeRanges(i_first, (i_first + _md), i_middle))
+                query_buff.append(IndexRange(i_first, (i_first + _md), i_middle))
             # Делим пополам правую часть
             if (_md := (i_last - i_middle) // 2) > 0:
-                query_buff.append(MergeRanges(i_middle, (i_middle + _md), i_last))
+                query_buff.append(IndexRange(i_middle, (i_middle + _md), i_last))
             # Результирующая очередь будет содержать индексы диапазонов для каждой из половин
-            query_work.append(MergeRanges(i_first, i_middle, i_last))
+            query_work.append(IndexRange(i_first, i_middle, i_last))
         # Сортируем все полученные половины и собираем из них результирующий отсортированный список
         while query_work:
             # Выбираем из очереди диапазоны начиная с меньших
@@ -508,16 +509,22 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
             i_right: int = i_middle
             # Поэлементно сравниваем половины и формируем результирующий список
             while i_left < len(left_list) and i_right < i_last:
+                # Порядок сравнения важен. В случае равенства, забираем значение из левой половины списка,
+                # дабы уменьшить или вовсе избавиться от вставки "хвоста" левой половины в сортируемый список.
                 if (
-                    (left_list[i_left] > _elements[i_right])
+                    (left_list[i_left] < _elements[i_right])
                     if revers  # Учитываем порядок сортировки
-                    else (left_list[i_left] < _elements[i_right])
+                    else (_elements[i_right] < left_list[i_left])
                 ):
-                    _elements[i_current] = left_list[i_left]
-                    i_left += 1
-                else:
-                    _elements[i_current] = _elements[i_right]
+                    # Если текущий индекс "догнал" правый, просто смещаем индексы
+                    if i_current != i_right:
+                        _elements[i_current] = _elements[i_right]
                     i_right += 1
+                else:
+                    # Если текущий и левый индексы указывают на одно и то же, просто смещаем индексы
+                    if i_current != (i_first + i_left):
+                        _elements[i_current] = left_list[i_left]
+                    i_left += 1
                 i_current += 1
             # Добавляем в результирующий список "хвост" от левой половины. Правая уже в списке.
             if i_left < len(left_list):
