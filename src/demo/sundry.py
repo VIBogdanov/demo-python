@@ -516,9 +516,7 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
                     if revers  # Учитываем порядок сортировки
                     else (_elements[i_right] < left_list[i_left])
                 ):
-                    # Если текущий индекс "догнал" правый, просто смещаем индексы
-                    if i_current != i_right:
-                        _elements[i_current] = _elements[i_right]
+                    _elements[i_current] = _elements[i_right]
                     i_right += 1
                 else:
                     # Если текущий и левый индексы указывают на одно и то же, просто смещаем индексы
@@ -526,7 +524,7 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
                         _elements[i_current] = left_list[i_left]
                     i_left += 1
                 i_current += 1
-            # Добавляем в результирующий список "хвост" от левой половины. Правая уже в списке.
+            # Добавляем в результирующий список "хвост" от левой половины. Правая уже содержится в списке.
             if i_left < len(left_list):
                 _elements[i_current:i_last] = left_list[i_left:]
 

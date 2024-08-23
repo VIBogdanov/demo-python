@@ -108,7 +108,7 @@ def abs_int(value: TIntValue) -> int:
     except (TypeError, ValueError) as exc:
         raise RuntimeError("The value must support conversion to int.") from exc
 
-    return -result if result < 0 else result
+    return (~result + 1) if result < 0 else result
 
 
 # --------------------------------------------------------------------------------------
@@ -354,9 +354,10 @@ def ilen(iterable: Iterable[Any]) -> int:
 def is_int(val: Any) -> bool:
     try:
         _ = int(val)
-        return True
-    except (ValueError, TypeError):
+    except Exception:
         return False
+    else:
+        return True
 
 
 # -------------------------------------------------------------------------------------------------
@@ -523,14 +524,15 @@ def rinda_multiplication(a: int, b: int) -> int:
     # Если одно из значений <0, то sign = (-1)**True = (-1)**1 = -1
     # Если оба <0 или >0, то sign = (-1)**False = (-1)**0 = 1
     sign: int = (-1) ** ((a < 0) ^ (b < 0))
-    # Далее работаем с абсолютными целочисленными значениями
-    # Для уменьшения количества итераций, выбираем наименьший множитель
-    if (b := abs_int(b)) < (a := abs_int(a)):
-        a, b = b, a
 
     # Внутренняя функция-генератор, которая выполняет попарное деление/умножение
     # на 2, и фильтрует четные значения, полученные после деления на 2.
     def _get_addendum(a, b) -> Generator[int, None, None]:
+        # Работаем с абсолютными целочисленными значениями
+        # Для уменьшения количества итераций, выбираем наименьший множитель
+        if (b := abs_int(b)) < (a := abs_int(a)):
+            a, b = b, a
+
         while a > 0:
             if a & 1:
                 yield b
