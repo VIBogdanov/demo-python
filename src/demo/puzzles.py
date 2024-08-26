@@ -1,10 +1,11 @@
 from array import array
 from collections import Counter, defaultdict, deque
 from collections.abc import Generator, Iterable, Iterator
+from enum import Enum
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
-from typing import TypeAlias, TypeVar
+from typing import TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
 # Но это ограничивает независимый запуск файла py, который в составе модуля
@@ -468,10 +469,11 @@ def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) ->
 
 
 # -------------------------------------------------------------------------------------------------
-TDigit = TypeVar("TDigit", int, float)
+TNumber = TypeVar("TNumber", int, float)
+TRanges: TypeAlias = list[tuple[int, int]]
 
 
-def get_minmax_ranges(digits: Iterable[TDigit]) -> dict[str, list[tuple[int, int]]]:
+def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
     """Алгоритм поиска в заданном списке цифр непрерывной последовательности чисел,
     сумма которых минимальна/максимальна. Заданный список может содержать как положительные,
     так и отрицательные значения, повторяющиеся и нулевые. Предварительная сортировка не требуется.
@@ -499,79 +501,110 @@ def get_minmax_ranges(digits: Iterable[TDigit]) -> dict[str, list[tuple[int, int
         digits (Iterable[TDigit]): Заданный список чисел.
 
     Returns:
-        dict[TDigit, list[tuple[int, int]]]: Словарь, в качестве ключей содержащий минимальную и максимальную
+        dict[str, list[tuple[int, int]]]: Словарь, в качестве ключей содержащий минимальную и максимальную
         суммы, а в качестве значений список пар диапазонов чисел. Внимание!!! Конечный индекс закрытый и указывает
         на число, входящее в диапазон. Для итерации конечный индекс необходимо нарастить на единицу.
     """
-    iter_digits: Iterator[TDigit] = iter(digits)
+    iter_numbers: Iterator[TNumber] = iter(numbers)
     # Из итератора получаем первый элемент для инициализации
     try:
-        first_digit: TDigit = next(iter_digits)
+        first_digit: TNumber = next(iter_numbers)
     except StopIteration:
         return dict()  # Если список исходных данных пуст
 
-    # Инициализируем для максимальной суммы
-    maxsum_cumulative = 0  # Накопитель суммы
-    maxsum_current: TDigit = first_digit  # Найденная максимальная сумма
-    # Список пар индексов begin/end диапазона чисел, составляющих сумму
-    maxsum_ranges: list[tuple[int, int]] = list()
-    # Список начальных индексов, т.к. одна и та же сумма может быть получена из разного набора цифр
-    maxsum_begin_list: list[int] = [
-        0,
-    ]
-    # Инициализация для минимальной суммы аналогична
-    minsum_cumulative = 0
-    minsum_current: TDigit = first_digit
-    minsum_ranges: list[tuple[int, int]] = list()
-    minsum_begin_list: list[int] = [
-        0,
-    ]
+    class SumMode(str, Enum):
+        MIN = "Min sum: "
+        MAX = "Max sum: "
+
+    class Sum:
+        """
+        Внутренний класс, вычисляющий минимальную или максимальную сумму в зависимости
+        от заданного режима.
+        """
+
+        __slots__ = (
+            "__mode",
+            "__sum",
+            "__accumulated",
+            "__ranges",
+            "__begin_list",
+        )
+
+        def __init__(self, init_number: TNumber, mode: SumMode) -> None:
+            self.__mode: SumMode = mode
+            # Искомая минимальная или максимальная сумма
+            self.__sum: TNumber = init_number
+            self.__accumulated: TNumber = cast(TNumber, 0)  # Накопитель суммы
+            # Список пар индексов begin/end диапазона чисел, составляющих сумму
+            self.__ranges: TRanges = list()
+            # Список начальных индексов, т.к. одна и та же сумма может быть получена из разного набора цифр
+            self.__begin_list: list[int] = [0]
+
+        def accumulation(self, idx: int, number: TNumber) -> None:
+            self.__accumulated += number
+            # Если накопленная сумма больше/меньше или сравнялась с ранее сохраненной
+            if not (
+                self.__accumulated < self.__sum
+                if self.__mode == SumMode.MAX
+                else self.__accumulated > self.__sum
+            ):
+                # Если накопленная сумма больше/меньше
+                if (
+                    self.__accumulated > self.__sum
+                    if self.__mode == SumMode.MAX
+                    else self.__accumulated < self.__sum
+                ):
+                    # Сохраняем накопленную сумму как искомую
+                    self.__sum = self.__accumulated
+                    # Сбрасываем список диапазонов суммы и формаруем новый
+                    self.__ranges.clear()
+                # Если накопленная сумма больше/меньше или равна, то формируем список пар начальных и конечных индексов
+                for i in self.__begin_list:
+                    self.__ranges.append((i, idx))
+            # Если накопленная сумма отрицательная/положительная или нулевая
+            if not (
+                self.__accumulated > 0
+                if self.__mode == SumMode.MAX
+                else self.__accumulated < 0
+            ):
+                # При отрицательной/положительной накопленной сумме
+                if (
+                    self.__accumulated < 0
+                    if self.__mode == SumMode.MAX
+                    else self.__accumulated > 0
+                ):
+                    self.__accumulated = cast(TNumber, 0)  # Обнуляем накопленную сумму
+                    self.__begin_list.clear()  # Очищаем список начальных индексов
+                # При отрицательной/положительной накопленной сумме формируем список начальных индексов заново.
+                # При нулевой - добавляем новый начальный индекс
+                self.__begin_list.append(idx + 1)
+
+        @property
+        def sum(self) -> TNumber:
+            return self.__sum
+
+        @property
+        def ranges(self) -> TRanges:
+            return self.__ranges
+
+        @property
+        def mode(self) -> SumMode:
+            return self.__mode
+
+    # Инициализируем первым элементом списка
+    minsum = Sum(first_digit, SumMode.MIN)
+    maxsum = Sum(first_digit, SumMode.MAX)
 
     # С помощью chain возвращаем первый элемент в итератор и запускаем цикл перебора значений
-    for idx, num in enumerate(chain((first_digit,), iter_digits)):
-        maxsum_cumulative += num  # Накапливаем максимальную сумму
-        minsum_cumulative += num  # Накапливаем минимальную сумму
+    for idx, number in enumerate(chain((first_digit,), iter_numbers)):
+        minsum.accumulation(idx, number)
+        maxsum.accumulation(idx, number)
 
-        # Если накопленная сумма превысила или сравнялась с ранее сохраненной
-        if not maxsum_cumulative < maxsum_current:
-            if maxsum_cumulative > maxsum_current:
-                # Сохраняем накопленную сумму как максимальную
-                maxsum_current = maxsum_cumulative
-                # Сбрасываем список диапазонов для максимальной суммы и формаруем новый
-                maxsum_ranges.clear()
-            # Если накопленная сумма больше или равна, то формируем список пар начальных и конечных индексов
-            for i in maxsum_begin_list:
-                maxsum_ranges.append((i, idx))
-
-        # Поиск минимальной суммы аналогичен, но с обратным сравнением
-        if not minsum_cumulative > minsum_current:
-            if minsum_cumulative < minsum_current:
-                minsum_current = minsum_cumulative
-                minsum_ranges.clear()
-            for i in minsum_begin_list:
-                minsum_ranges.append((i, idx))
-
-        # Если накопительная сумма отрицательная или нулевая
-        if not maxsum_cumulative > 0:
-            # При отрицательной накопительной сумме
-            if maxsum_cumulative < 0:
-                maxsum_cumulative = 0  # Обнуляем накопительную сумму
-                maxsum_begin_list.clear()  # Очищаем список начальных индексов
-            # При отрицательной сумме формируем список начальных индексов заново.
-            # При нулевой - добавляем новый начальный индекс
-            maxsum_begin_list.append(idx + 1)
-
-        # Для минимальной суммы аналогично, но с обратным сравнением
-        if not minsum_cumulative < 0:
-            if minsum_cumulative > 0:
-                minsum_cumulative = 0
-                minsum_begin_list.clear()
-            minsum_begin_list.append(idx + 1)
     # Для результирующего словаря в качестве ключей используем строковые значения,
     # т.к. минимальная и максимальная суммы могут быть равны.
     return {
-        f"Min sum: {minsum_current}": minsum_ranges,
-        f"Max sum: {maxsum_current}": maxsum_ranges,
+        f"{minsum.mode.value}{minsum.sum}": minsum.ranges,
+        f"{maxsum.mode.value}{maxsum.sum}": maxsum.ranges,
     }
 
 
