@@ -474,14 +474,14 @@ TRanges: TypeAlias = list[tuple[int, int]]
 
 
 def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
-    """Алгоритм поиска в заданном списке цифр непрерывной последовательности чисел,
+    """Алгоритм поиска в заданном списке непрерывной последовательности чисел,
     сумма которых минимальна/максимальна. Заданный список может содержать как положительные,
     так и отрицательные значения, повторяющиеся и нулевые. Предварительная сортировка не требуется.
 
     Алгоритм за один проход по заданному списку одновременно находит минимальную и максимальную
     суммы и все возможные комбинации непрерывных диапазонов чисел, формирующие эти суммы.
-    Для примера на максимальной сумме, суть алгоритма в следующем:
 
+    Для примера на максимальной сумме, суть алгоритма в следующем:
     Числа из списка накопительно суммируются. Если очередная накопительная сумма становится
     отрицательной, то это означает, что предыдущий диапазон чисел можно отбросить.
     Например:  [1, 2, -4, 5, 3, -1]  Первые три значения дают отрицательную сумму.
@@ -540,7 +540,7 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
             # Список начальных индексов, т.к. одна и та же сумма может быть получена из разного набора цифр
             self.__begin_list: list[int] = [0]
 
-        def accumulation(self, idx: int, number: TNumber) -> None:
+        def __call__(self, index: int, number: TNumber) -> None:
             self.__accumulated += number
             # Если накопленная сумма больше/меньше или сравнялась с ранее сохраненной
             if not (
@@ -560,7 +560,7 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
                     self.__ranges.clear()
                 # Если накопленная сумма больше/меньше или равна, то формируем список пар начальных и конечных индексов
                 for i in self.__begin_list:
-                    self.__ranges.append((i, idx))
+                    self.__ranges.append((i, index))
             # Если накопленная сумма отрицательная/положительная или нулевая
             if not (
                 self.__accumulated > 0
@@ -577,7 +577,7 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
                     self.__begin_list.clear()  # Очищаем список начальных индексов
                 # При отрицательной/положительной накопленной сумме формируем список начальных индексов заново.
                 # При нулевой - добавляем новый начальный индекс
-                self.__begin_list.append(idx + 1)
+                self.__begin_list.append(index + 1)
 
         @property
         def sum(self) -> TNumber:
@@ -592,19 +592,19 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
             return self.__mode
 
     # Инициализируем первым элементом списка
-    minsum = Sum(first_digit, SumMode.MIN)
-    maxsum = Sum(first_digit, SumMode.MAX)
+    min_sum = Sum(first_digit, SumMode.MIN)
+    max_sum = Sum(first_digit, SumMode.MAX)
 
     # С помощью chain возвращаем первый элемент в итератор и запускаем цикл перебора значений
     for idx, number in enumerate(chain((first_digit,), iter_numbers)):
-        minsum.accumulation(idx, number)
-        maxsum.accumulation(idx, number)
+        min_sum(idx, number)
+        max_sum(idx, number)
 
     # Для результирующего словаря в качестве ключей используем строковые значения,
     # т.к. минимальная и максимальная суммы могут быть равны.
     return {
-        f"{minsum.mode.value}{minsum.sum}": minsum.ranges,
-        f"{maxsum.mode.value}{maxsum.sum}": maxsum.ranges,
+        f"{min_sum.mode.value}{min_sum.sum}": min_sum.ranges,
+        f"{max_sum.mode.value}{max_sum.sum}": max_sum.ranges,
     }
 
 
