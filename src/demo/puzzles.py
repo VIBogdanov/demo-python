@@ -8,7 +8,7 @@ from math import prod
 from typing import TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
-# Но это ограничивает независимый запуск файла py, который в составе модуля
+# Но это ограничивает независимый запуск файла puzzles.py, который в составе модуля
 from demo import ilen
 
 T = TypeVar("T")
@@ -196,7 +196,7 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     Returns:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
-    len_lastdig: int = len(digits)
+    len_lastdig: int = ilen(digits)
     if (count <= 0) and (pages < count) and (len_lastdig) == 0:
         return 0
 

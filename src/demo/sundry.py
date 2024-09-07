@@ -1,14 +1,13 @@
 from collections import defaultdict, deque
-from collections.abc import Collection, Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
-from demo import get_positive_int, is_int, type_checking
+from demo import abs_int, is_int, type_checking
 
 T = TypeVar("T")
-TNumber: TypeAlias = int | float | str
 TInt: TypeAlias = int | str
 
 
@@ -68,7 +67,7 @@ def find_intervals(
 
 # -------------------------------------------------------------------------------
 def find_nearest_number(
-    number: TNumber,
+    number: int | str,
     *,
     previous: bool = True,
 ) -> int | None:
@@ -77,8 +76,8 @@ def find_nearest_number(
     и состоит из тех же цифр.
 
     Args:
-        number (int | float | str): Целое число, относительно которого осуществляется \
-        поиск. Допускается строковое представление числа, положительные или отрицательные значения.
+        number (int | str): Целое число, относительно которого осуществляется поиск.
+        Допускается строковое представление числа, положительные или отрицательные значения.
 
         previous (bool, optional): Направление поиска: ближайшее меньшее или большее. Default: True - ближайшее меньшее.
 
@@ -182,7 +181,7 @@ def _do_find_nearest(
 
 # ------------------------------------------------------------------------------------
 def find_item_by_binary(
-    elements: Collection[Any],
+    elements: Sequence,
     target: Any,
 ) -> int | None:
     """
@@ -245,7 +244,7 @@ def find_item_by_binary(
 
 # ---------------------------------------------find_item_by_interpolation---------------------------------------------
 def find_item_by_interpolation(
-    elements: Collection[int | float],
+    elements: Sequence[int | float],
     target: int | float,
 ) -> int | None:
     """
@@ -394,7 +393,7 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
 
 # ------------------------------------------------------------------------------------------------
-def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
+def sort_by_merge(elements: Iterable[Any], *, revers: bool = False) -> list[Any]:
     """
     Функция сортировки методом слияния. Поддерживается сортировка как
     по возрастанию, так и по убыванию.
@@ -407,18 +406,18 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
         list: Результирующий отсортированный список.
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
-    # try:
-    #    _elements: list = list(elements)
-    # except (ValueError, TypeError):
-    #    return []
+    try:
+        _elements: list = list(elements)
+    except (ValueError, TypeError):
+        return []
 
-    if len(elements) > 1:
+    if len(_elements) > 1:
         # Делим исходный список пополам.
-        i_middle: int = len(elements) // 2
+        i_middle: int = len(_elements) // 2
         # Рекурсивно вызываем функцию до тех пор,
         # пока исходный список не будет разложен поэлементно.
-        left_list: list = sort_by_merge(elements[:i_middle], revers=revers)
-        right_list: list = sort_by_merge(elements[i_middle:], revers=revers)
+        left_list: list = sort_by_merge(_elements[:i_middle], revers=revers)
+        right_list: list = sort_by_merge(_elements[i_middle:], revers=revers)
         # Собираем список из стека рекурсивных вызовов
         i_left: int = 0
         i_right: int = 0
@@ -431,24 +430,24 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
                 if revers
                 else (right_list[i_right] > left_list[i_left])
             ):
-                elements[i_result] = left_list[i_left]
+                _elements[i_result] = left_list[i_left]
                 i_left += 1
             else:
-                elements[i_result] = right_list[i_right]
+                _elements[i_result] = right_list[i_right]
                 i_right += 1
             i_result += 1
         # Добавляем в результирующий список "хвосты", оставшиеся от половинок.
         match (i_left < len(left_list), i_right < len(right_list)):
             case (True, False):
-                elements[i_result:] = left_list[i_left:]
+                _elements[i_result:] = left_list[i_left:]
             case (False, True):
-                elements[i_result:] = right_list[i_right:]
+                _elements[i_result:] = right_list[i_right:]
 
-    return elements
+    return _elements
 
 
 # --------------------------------------------------------------------------------------------
-def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
+def sort_by_merge2(elements: Iterable[Any], *, revers: bool = False) -> list[Any]:
     """
     Усовершенствованная версия функции сортировки методом слияния (см. sort_by_merge). В отличии
     от оригинальной версии не использует рекурсивные вызовы и не создает каскад списков.
@@ -473,14 +472,14 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     # Создаем копию списка, на котором будем производить сортировку. Он же будет результирующим.
     # Копия нужна, т.к. мы не знаем что будет на входе, например, если это итератор или генератор.
     try:
-        _elements: list[T] = list(elements)
+        _elements: list[Any] = list(elements)
     except Exception as exc:
         raise RuntimeError("Input data must be convertible into a list.") from exc
 
     if (_ln := len(_elements)) > 1:
         # Очереди для создания списка индексов.
-        query_buff: deque = deque()
-        query_work: deque = deque()
+        query_buff: deque[IndexRange] = deque()
+        query_work: deque[IndexRange] = deque()
         # Инициализируем буферную очередь исходным списком, деленным пополам
         query_buff.append(IndexRange(0, (_ln // 2), _ln))
         # Далее делим пополам обе половины до тех пор, пока в каждой половине не останется по два элемента
@@ -551,7 +550,9 @@ class GetRangesSort(Iterable):
 
     __slots__ = "__calc_res"
 
-    def __init__(self, list_len: int, method: SortMethod = SortMethod.SHELL) -> None:
+    def __init__(
+        self, list_len: int, method: SortMethod | str = SortMethod.SHELL
+    ) -> None:
         self.__calc_res: list[int] = list()
         # Исходя из заданного метода, вычисляем на какие диапазоны можно разбить исходный список
         match method:
@@ -625,7 +626,7 @@ def sort_by_shell(
     elements: Iterable[T],
     *,
     revers: bool = False,
-    method: SortMethod = SortMethod.SHELL,
+    method: SortMethod | str = SortMethod.SHELL,
 ) -> list[T]:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
@@ -767,7 +768,7 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
 
 
 # -------------------------------------------------------------------------------------------------
-TNumber = TypeVar("TNumber", int, str, bytes)
+TNumber = TypeVar("TNumber", int, str)
 
 
 @type_checking(TNumber.__constraints__, TNumber.__constraints__)
@@ -792,15 +793,11 @@ def get_common_divisor(number_a: TNumber, number_b: TNumber) -> int | None:
     Returns:
         int: Наибольший общий делитель. Если делитель равен 0, возвращает None.
     """
-    # На всякий случай
-    number_a = get_positive_int(number_a)
-    number_b = get_positive_int(number_b)
+    divisible: int = abs_int(number_a)
+    divisor: int = abs_int(number_b)
     # Определяем делимое и делитель. Делимое - большее число. Делитель - меньшее.
-    divisible, divisor = (
-        (number_a, number_b)
-        if max(number_a, number_b) == number_a
-        else (number_b, number_a)
-    )
+    if divisor > divisible:
+        divisible, divisor = divisor, divisible
 
     # Ищем общий делитель как остаток от деления, при котором на следующей итерации остаток от деления равен 0.
     while divisor:

@@ -6,12 +6,9 @@ from itertools import count
 from logging import Formatter, Logger, StreamHandler, getLogger
 from multiprocessing import Pool, cpu_count
 from time import perf_counter
-from typing import Any, Self, SupportsInt, TypeAlias, TypeVar
+from typing import Any, Self
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
-TAny = TypeVar("TAny")
-T = TypeVar("T")
-NumberStrNone: TypeAlias = int | float | str | None
 
 
 # ---------------------Decorators-------------------------------------------------------
@@ -87,19 +84,14 @@ def is_even(n: int) -> bool:
 
 
 # --------------------------------------------------------------------------------------
-def get_positive_int(value: SupportsInt) -> int:
-    return abs_int(value)
-
-
-# --------------------------------------------------------------------------------------
-def abs_int(value: SupportsInt) -> int:
+def abs_int(value: Any) -> int:
     """
     Проверяет значение на положительное целое.
     Если переданное значение невозможно представить как целое число,
-    возбудит исключение. Отрицательное число конвертирует в положительное.
+    возбуждает исключение. Отрицательное число конвертирует в положительное.
 
     Args:
-        value: Значение для проверки. Число или None
+        value: Значение для проверки.
 
     Returns:
         int: Возвращает целое положительное число
@@ -129,8 +121,8 @@ def get_ranges_index(
         (start, end): Возвращает кортеж с начальным и конечным индексами диапазона.
     """
     # Корректируем возможные ошибки во входных параметрах
-    _list_len: int = get_positive_int(list_len)
-    _range_len: int = get_positive_int(range_len)
+    _list_len: int = abs_int(list_len)
+    _range_len: int = abs_int(range_len)
     # Исключаем ошибки и слишком короткие величины длин.
     if any(
         (
@@ -190,7 +182,7 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
 
 # --------------------------------------------------------------------------------------
 def is_sorted(
-    elements: Sequence[TAny],
+    elements: Sequence,
     *,
     revers: bool = False,
     rangesize: int | None = None,
@@ -301,7 +293,7 @@ def get_day_week_name(iday: int, imonth: int, iyear: int) -> str:
 
 
 # -------------------------------------------------------------------------------------------------
-def is_includes_elements(data: Iterable[Any], pattern: Iterable[Any]) -> bool:
+def is_includes_elements(data: Iterable, pattern: Iterable) -> bool:
     """
     Проверяет вхождение одного набора данных в другой. Сортировка не требуется, порядок не важен,
     дублирование элементов допускается, относительный размер списков не принципиален.
@@ -326,7 +318,7 @@ def is_includes_elements(data: Iterable[Any], pattern: Iterable[Any]) -> bool:
 
 
 # -------------------------------------------------------------------------------------------------
-def ilen(iterable: Iterable[Any]) -> int:
+def ilen(iterable: Iterable) -> int:
     """
     Подсчитывает количество элементов в итераторе. Попытка достичь компромиса между
     скоростью и потреблением памяти.
@@ -334,20 +326,20 @@ def ilen(iterable: Iterable[Any]) -> int:
     не потребляет память.
 
     Args:
-        iterable (Iterable[Any]): Набор данных, который поддерживает итерации.
+        iterable (Iterable): Набор данных, который поддерживает итерации.
 
     Returns:
         int: Количество элементов в данных.
     """
     # Если объект данных поддерживает метод len, то используем встроенный механизм
     if hasattr(iterable, "__len__"):
-        return len(iterable)
+        return len(iterable)  # type: ignore
     # Бесконечный счетчик-итератор
     iter_counter = count()
-    # Создаем очередь нулевой длины, которая используется только для инкреминтирования
+    # Создаем очередь нулевой длины, которая используется только для наращивания
     # счетчика iter_counter, и никаких данных не хранит.
     deque(zip(iterable, iter_counter), 0)
-    # Возвращаем значение счетчика
+    # Возвращаем значение счетчика. Т.к. отсчет ведется с нуля, прибавляем единицу
     return next(iter_counter)
 
 
@@ -491,7 +483,7 @@ class Timer:
 
 
 # -------------------------------------------------------------------------------------------------
-class LogToConsole:
+class WarningToConsole:
     __slots__ = "__logger"
 
     def __init__(self, msg: str | None = None, logname: str | None = None) -> None:
@@ -501,12 +493,16 @@ class LogToConsole:
             "{asctime} [{levelname}] - {message}"
             if logname is None
             else "{asctime} [{levelname}] — {name} - {message}",
+            datefmt="%d-%m-%Y %H:%M:%S",
             style="{",
         )
         _handler.setFormatter(_formatter)
         self.__logger.addHandler(_handler)
         if msg is not None:
             self.warning(msg)
+
+    def __call__(self, msg: str) -> None:
+        self.warning(msg)
 
     def warning(self, *args: Any, **kwargs: Any) -> None:
         self.__logger.warning(*args, **kwargs)
