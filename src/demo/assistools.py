@@ -1,8 +1,9 @@
 from collections import Counter, OrderedDict, deque
-from collections.abc import Generator, Iterable, Iterator, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
 from functools import wraps
 from inspect import Signature, signature
 from itertools import count
+from logging import Formatter, Logger, StreamHandler, getLogger
 from multiprocessing import Pool, cpu_count
 from time import perf_counter
 from typing import Any, Self, SupportsInt, TypeAlias, TypeVar
@@ -21,25 +22,28 @@ def type_checking(*type_args, **type_kwargs):
     Требуемый тип задается либо как отдельное значение, либо как кортеж типов.
 
     Examples:
-    @typeassert(int, (int, str), z=float)
-    def samefunction(x, y, z=4.5)
-
-    @typeassert(y = (int, str), x = int)
-    def samefunction(x, y, z=4.5)
-
-    - samefunction(1, 3, z=123.5)   #OK
-    - samefunction(1, '3', z=123.5)   #OK
-    - samefunction(1, 3)   #OK
-    - samefunction('1', 3, z=123.5)   #Error
-    - samefunction(1, 3, z=123)   #Error
-    - samefunction(1, 3.4)   #Error
+        >>>
+        @type_checking(int, (int, str), z=float)
+        def samefunction(x, y, z=4.5):
+            pass
+        # Альтернативный вариант
+        @type_checking(y = (int, str), x = int)
+        def samefunction(x, y, z=4.5):
+            pass
+        # Результат работы декоратора
+        samefunction(1, 3, z=123.5)   #OK
+        samefunction(1, '3', z=123.5)   #OK
+        samefunction(1, 3)   #OK
+        samefunction('1', 3, z=123.5)   #Error
+        samefunction(1, 3, z=123)   #Error for first variant
+        samefunction(1, 3.4)   #Error
     """
 
     def decorate(func):
         # В режиме оптимизации отключаем декоратор
         if not __debug__:
             return func
-        # Формируем словарь, связывающий арнументы функции с типами, заданными в декораторе
+        # Формируем словарь, связывающий арнументы функции с требованиями типов, заданными в декораторе
         func_signature: Signature = signature(func)
         args_types: OrderedDict[str, Any] = func_signature.bind_partial(
             *type_args, **type_kwargs
@@ -83,22 +87,19 @@ def is_even(n: int) -> bool:
 
 
 # --------------------------------------------------------------------------------------
-TIntValue = TypeVar("TIntValue", bound=SupportsInt)
-
-
-def get_positive_int(value: TIntValue) -> int:
+def get_positive_int(value: SupportsInt) -> int:
     return abs_int(value)
 
 
 # --------------------------------------------------------------------------------------
-def abs_int(value: TIntValue) -> int:
+def abs_int(value: SupportsInt) -> int:
     """
     Проверяет значение на положительное целое.
     Если переданное значение невозможно представить как целое число,
     возбудит исключение. Отрицательное число конвертирует в положительное.
 
     Args:
-        value (NumberNone): Значение для проверки. Число или None
+        value: Значение для проверки. Число или None
 
     Returns:
         int: Возвращает целое положительное число
@@ -151,8 +152,7 @@ def _is_srt(args: tuple[Iterator, bool]) -> bool:
     итерация прерывается.
 
     Args:
-        args (tuple[Iterable, bool]): Кортеж параметров - итератор списка для проверки и
-        направление сортировки
+        args (tuple[Iterable, bool]): Кортеж параметров - итератор списка для проверки и направление сортировки
 
     Returns:
         bool: True/False - список отсортирован / не отсортирован.
@@ -204,7 +204,7 @@ def is_sorted(
     Args:
         elements (Sequence): Массив данных для проверки.
 
-        revers (bool, optional): Порядок сортировки. Defaults to False.
+        revers (bool): Порядок сортировки. Defaults to False.
 
         rangesize (int | None): Размер диапазона, на который можно разбить список. Defaults to None.
 
@@ -262,12 +262,12 @@ def is_sorted(
 
 # -------------------------------------------------------------------------------------------------
 def get_day_week_index(iday: int, imonth: int, iyear: int) -> int:
-    if m := abs(imonth) % 12:
+    if m := abs_int(imonth) % 12:
         imonth = m
     else:
         imonth = 12
 
-    iyear = abs(iyear)
+    iyear = abs_int(iyear)
     # По древнеримскому календарю год начинается с марта.
     # Январь и февраль относятся к прошлому году
     if imonth == 1 or imonth == 2:
@@ -281,7 +281,8 @@ def get_day_week_index(iday: int, imonth: int, iyear: int) -> int:
 
     # Original: (day + (13*month-1)/5 + year + year/4 + century/4 - 2*century + 777) % 7
     return int(
-        (abs(iday) + (13 * imonth - 1) // 5 + (5 * iyear - 7 * icentury) // 4 + 777) % 7
+        (abs_int(iday) + (13 * imonth - 1) // 5 + (5 * iyear - 7 * icentury) // 4 + 777)
+        % 7
     )
 
 
@@ -306,9 +307,9 @@ def is_includes_elements(data: Iterable[Any], pattern: Iterable[Any]) -> bool:
     дублирование элементов допускается, относительный размер списков не принципиален.
 
     Args:
-        data: Список, с которым сравнивается pattern.
+        data (Iterable[Any]): Список, с которым сравнивается pattern.
 
-        pattern: Проверяемый список на вхождение в data.
+        pattern (Iterable[Any]): Проверяемый список на вхождение в data.
 
     Returns:
         bool: True - если все элементы из pattern присутствуют в data.
@@ -333,7 +334,7 @@ def ilen(iterable: Iterable[Any]) -> int:
     не потребляет память.
 
     Args:
-        iterable: Набор данных, который поддерживает итерации.
+        iterable (Iterable[Any]): Набор данных, который поддерживает итерации.
 
     Returns:
         int: Количество элементов в данных.
@@ -365,6 +366,7 @@ class Timer:
     """Класс-таймер, для замеров времени выполнения кода.
     Поддерживает как ручной запуск/останов: start()/stop(), так и менеджер контента 'with'
     и декорирование @Timer().
+
     При инициализации или в процессе использования задаются функция источник времени и
     признак накопления измеренных интервалов. По умолчанию используется time.perf_counter
     и накопление отключено.
@@ -379,7 +381,9 @@ class Timer:
         "__weakref__",
     )
 
-    def __init__(self, time_source=perf_counter, is_accumulate: bool = False) -> None:
+    def __init__(
+        self, time_source: Callable = perf_counter, is_accumulate: bool = False
+    ) -> None:
         self.__elapsed_time: float = 0.0
         self.__time_source = time_source
         self.__start_time = None
@@ -388,10 +392,16 @@ class Timer:
     # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
     # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
     # Возможно задать и параметр is_accumulate, но он будет проигнорирован
-    def __call__(self, func):
+    def __call__(self, func: Callable):
         @wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
             result: Any = None
+            func_parameters: str = ", ".join(
+                f"{arg_name}={arg_value}"
+                for arg_name, arg_value in signature(func)
+                .bind(*args, **kwargs)
+                .arguments.items()
+            )
             # Для декоратора используем свои собственные временные метки start и elapsed.
             # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
             # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
@@ -400,24 +410,18 @@ class Timer:
                 result = func(*args, **kwargs)
             except Exception as exc:
                 raise RuntimeError(
-                    f"Call error {func.__module__}.{func.__name__}"
+                    f"Call error {func.__module__}.{func.__name__}({func_parameters})"
                 ) from exc
             else:
                 # При измерении интервала времени для декоратора аккумулирование не используется.
                 # Для декоратора накопление не имеет смысла, т.к. измеряется конкретная функция
                 # в конкретный момент ее вызова
-                # Тонкий момент: можно было бы встроить вычисление elapsed_time прямо в строку форматирование
+                # Тонкий момент: можно было бы встроить вычисление elapsed_time прямо в строку форматирования
                 # оператора print, но тогда в измерение интервала времени было бы внесено искажение,
-                # связанное c затратами на формирования отформатированной строки для оператора print
+                # связанное c затратами на формирование отформатированной строки для оператора print
                 elapsed_time = self.__time_source() - start_time
-                parameters = ", ".join(
-                    f"{arg_name}={arg_value}"
-                    for arg_name, arg_value in signature(func)
-                    .bind(*args, **kwargs)
-                    .arguments.items()
-                )
                 print(
-                    f"{func.__module__}.{func.__name__}({parameters}) : {elapsed_time}"
+                    f"{func.__module__}.{func.__name__}({func_parameters}) : {elapsed_time}"
                 )
             return result
 
@@ -451,7 +455,7 @@ class Timer:
         return self.__time_source
 
     @time_sourse.setter
-    def time_sourse(self, func) -> None:
+    def time_sourse(self, func: Callable) -> None:
         self.__time_source = func
 
     @property
@@ -484,6 +488,28 @@ class Timer:
 
     def __exit__(self, *args) -> None:
         self.stop()
+
+
+# -------------------------------------------------------------------------------------------------
+class LogToConsole:
+    __slots__ = "__logger"
+
+    def __init__(self, msg: str | None = None, logname: str | None = None) -> None:
+        self.__logger: Logger = getLogger(__name__ if logname is None else logname)
+        _handler = StreamHandler()
+        _formatter = Formatter(
+            "{asctime} [{levelname}] - {message}"
+            if logname is None
+            else "{asctime} [{levelname}] — {name} - {message}",
+            style="{",
+        )
+        _handler.setFormatter(_formatter)
+        self.__logger.addHandler(_handler)
+        if msg is not None:
+            self.warning(msg)
+
+    def warning(self, *args: Any, **kwargs: Any) -> None:
+        self.__logger.warning(*args, **kwargs)
 
 
 # -------------------------------------------------------------------------------------------------

@@ -26,7 +26,9 @@ from typing import NamedTuple
 
 from pandas import DataFrame, ExcelWriter
 
-STRIP_TEMPL = r"""_ .,:;"'!?-=()[]{}\|/"""
+from demo import LogToConsole
+
+STRIP_TEMPL = r"""_ .,:;"'!?-+=*()[]{}\|/"""
 BUFFER_SIZE = 1024 * 100
 
 
@@ -206,15 +208,15 @@ def get_check_request(
                 return request.quantity >= min_quantity
         # Что то пошло не так
         case _:
-
+            # Формируем функцию-пустышку с той же сигнатурой, что у полноценной функции
             def nofn(_: Request) -> bool:
                 return False
 
-            # None - признак невозможности определить функцию сравнения.
-            nofn.compare = None
+            # признак невозможности определить функцию сравнения.
+            nofn.is_OK = False
             return nofn
-    # В атрибуте возвращаемой функции сохраняем метод сравнения
-    fn.compare = phrase.compare_type
+
+    fn.is_OK = True
     return fn
 
 
@@ -237,15 +239,18 @@ def main():
     # то csv файл должен быть расположен в папке /samefolders/data/requests.csv
     # Чтобы работать в текущей папке: DIR_NAME = r""
     csv_filename = Path(Path(__file__).parent, DIR_NAME, CSV_NAME).resolve()
+    if not csv_filename.exists():
+        LogToConsole(f"The file {csv_filename} does not exists!")
+        return
     # Файл Excel сохраняем рядом с csv в той же папке с тем же именем
-    exel_filename = csv_filename.with_suffix(".xlsx")
+    excel_filename = csv_filename.with_suffix(".xlsx")
 
     # определяем функцию сравнения запросов с поисковой фразой
     check_request = get_check_request(
         get_phrase(SEARCH_PHRASE, COMPARE_TYPE), MIN_QUANTITY
     )
     # Если удалось определить функцию сравнения. Иначе программа завершиться досрочно без какой-либо обработки.
-    if check_request.compare is not None:
+    if check_request.is_OK:
         # формируем генератор для построчного отбора запросов по поисковой фразе
         requests_generator: Generator[Request, None, None] = (
             request for request in get_request(csv_filename) if check_request(request)
@@ -274,11 +279,15 @@ def main():
 
             # Сохраняем оба полученных DataFrame в Excel на отдельных листах с перезаписью
             if IS_SAVETOEXCEL:
-                with ExcelWriter(exel_filename) as xls_writer:
+                with ExcelWriter(excel_filename) as xls_writer:
                     dfr[["request", "quantity"]].to_excel(
                         xls_writer, sheet_name="requests", index=False
                     )
                     dfw.to_excel(xls_writer, sheet_name="words", index=False)
+        else:
+            LogToConsole("The request selection is empty!")
+    else:
+        LogToConsole("Function 'check_request' not defined!")
 
 
 if __name__ == "__main__":

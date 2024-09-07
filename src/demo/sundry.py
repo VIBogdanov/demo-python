@@ -32,7 +32,7 @@ def find_intervals(
         target (int): Искомое целое число, для которого ищется сумма элементов списка.
 
     Returns:
-        list[tuple[int, int]]: Результирующий список диапазонов элементов. Диапазоны задаются в виде
+        (list[tuple[int, int]]): Результирующий список диапазонов элементов. Диапазоны задаются в виде
         кортежей пары целых чисел, обозначающих индексы элементов списка, включая начальный и
         конечный индексы включительно. Если ни один диапазон не найден, возвращается пустой список.
 
@@ -77,12 +77,10 @@ def find_nearest_number(
     и состоит из тех же цифр.
 
     Args:
-        number (int | float | str): Целое число, относительно которого осуществляется
-        поиск. Допускается строковое представление числа, положительные или
-        отрицательные значения.
+        number (int | float | str): Целое число, относительно которого осуществляется \
+        поиск. Допускается строковое представление числа, положительные или отрицательные значения.
 
-        previous (bool, optional): Направление поиска: ближайшее меньшее или
-        большее. По-умолчанию True - ближайшее меньшее.
+        previous (bool, optional): Направление поиска: ближайшее меньшее или большее. Default: True - ближайшее меньшее.
 
     Returns:
         (int | None): Если поиск безуспешен, возвращается значение None.
@@ -153,8 +151,7 @@ def _do_find_nearest(
         previous (bool): Направление поиска: ближайшее большее или меньшее. True - меньшее, False - большее
 
     Returns:
-        (int | None): Возвращает найденное целое число или None в случае
-        безуспешного поиска
+        (int | None): Возвращает найденное целое число или None в случае безуспешного поиска
 
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
@@ -203,7 +200,7 @@ def find_item_by_binary(
         target (Any): Значение, которое необходимо найти
 
     Returns:
-        int | None: Функция возвращает индекс элемента в массиве, который равен искомому значению.
+        (int | None): Функция возвращает индекс элемента в массиве, который равен искомому значению.
         В случае неудачного поиска, возвращается None.
     """
     # Исключаем пустые и односимвольные списки
@@ -266,7 +263,7 @@ def find_item_by_interpolation(
         target (int | float): Значение, которое необходимо найти
 
     Returns:
-        int | None: Индекс элемента в массиве, который равен искомому значению.
+        (int | None): Индекс элемента в массиве, который равен искомому значению.
         В случае неудачного поиска, возвращается None.
     """
     # Исключаем пустые и односимвольные списки
@@ -342,7 +339,7 @@ def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     Args:
         elements (Iterable): Список данных для сортировки
 
-        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+        revers (bool): Если задано True, то сортировка по убыванию. Defaults to False.
 
     Returns:
         list: Возвращает отсортированный список
@@ -404,7 +401,7 @@ def sort_by_merge(elements: Iterable[T], *, revers: bool = False) -> list[T]:
 
     Args:
         elements (Iterable): Список данных для сортировки.
-        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+        revers (bool): Если задано True, то сортировка по убыванию. Defaults to False.
 
     Returns:
         list: Результирующий отсортированный список.
@@ -461,7 +458,7 @@ def sort_by_merge2(elements: Iterable[T], *, revers: bool = False) -> list[T]:
     Args:
         elements (Iterable[T]): Список данных для сортировки.
 
-        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+        revers (bool): Если задано True, то сортировка по убыванию. Defaults to False.
 
     Returns:
         list[T]: Результирующий отсортированный список.
@@ -643,10 +640,9 @@ def sort_by_shell(
     Args:
         elements (Iterable): Список данных для сортировки
 
-        revers (bool, optional): Если задано True, то сортировка по убыванию. Defaults to False.
+        revers (bool): Если задано True, то сортировка по убыванию. Defaults to False.
 
-        method (SortMethod, optional): Метод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth,
-        Fibonacci. Defaults to "Shell".
+        method (SortMethod): Метод формирования диапазона: Shell, Hibbard, Sedgewick, Knuth, Fibonacci. Defaults to "Shell".
 
     Returns:
         list: Отсортированный список.
@@ -689,7 +685,7 @@ def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]
     Args:
         elements (Iterable): Список данных для сортировки.
 
-        revers (bool, optional): Если задано True, список сортируется по убыванию. Defaults to False.
+        revers (bool): Если задано True, список сортируется по убыванию. Defaults to False.
 
     Returns:
         list: Возвращает отсортированный список.

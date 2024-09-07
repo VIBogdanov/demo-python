@@ -21,10 +21,6 @@ def get_min_permutations(source_list: Iterable[T], target_list: Iterable[T]) -> 
     Подсчитывает минимальное количество перестановок, которое необходимо произвести для того,
     чтобы из исходного списка source_list получить целевой список target_list. При этом порядок
     следования и непрерывность списков не имеют значения.
-    Например для списков:
-    [10, 31, 15, 22, 14, 17, 16]
-    [16, 22, 14, 10, 31, 15, 17]
-    Требуется выполнить три перестановки для приведения списков в идентичное состояние.
 
     Args:
         source_list (Iterable[T]): Исходный список
@@ -33,6 +29,12 @@ def get_min_permutations(source_list: Iterable[T], target_list: Iterable[T]) -> 
 
     Returns:
         int: Минимальное количество перестановок
+
+    Example:
+        >>> source = [10, 31, 15, 22, 14, 17, 16]
+            target = [16, 22, 14, 10, 31, 15, 17]
+            get_min_permutations(source, target)
+            3
     """
     # формируем список из номеров позиций для каждого значения из целевого списка.
     # Само значение является ключом.
@@ -74,22 +76,22 @@ def mult_matrix(
 
         max_val (float | int | None, optional): Максимальная граница диапазона. Defaults to None.
 
-        default_val (float | int, optional): Генерируемое значение в случае невозможности
+        default_val (float | int, optional): Генерируемое значение в случае невозможности \
         выполнить перемножение. Defaults to 0.00.
 
     Returns:
-        list[float]: Список значений как результат построчного перемножения двумерной матрицы.
+        (list[float]): Список значений как результат построчного перемножения двумерной матрицы.
         Количество элементов в списке соответствует количеству строк в матрице.
 
     Example:
         >>> matrix = [
-                [1.192, 1.192, 2.255, 0.011, 2.167],
-                [1.192, 1.192, 2.255, 0.011, 2.167],
-                [2.255, 2.255, 1.734, 0.109, 5.810],
-                [0.011, 0.011, 0.109, 0.420, 1.081],
-                [2.167, 2.167, 5.810, 1.081, 0.191]
+            [1.192, 1.192, 2.255, 0.011, 2.167],
+            [1.192, 1.192, 2.255, 0.011, 2.167],
+            [2.255, 2.255, 1.734, 0.109, 5.810],
+            [0.011, 0.011, 0.109, 0.420, 1.081],
+            [2.167, 2.167, 5.810, 1.081, 0.191]
             ]
-            mult_matrix(matrix,2,10)
+            mult_matrix(matrix, 2,10)
             [4.887, 4.887, 29.544, 0, 27.283]
 
     """
@@ -138,15 +140,15 @@ def count_items(
         (int | float | None): Результат подсчета в зависимости от заданного вида.
 
     Example:
-    >>> data = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a']
-        count_items(data, '0')
-        9
-        count_items(data, '0', 'min')
-        1
-        count_items(data, '0', 'max')
-        5
-        count_items(data, '0', 'count')
-        4
+        >>> data = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a']
+            count_items(data, '0')
+            9
+            count_items(data, '0', 'min')
+            1
+            count_items(data, '0', 'max')
+            5
+            count_items(data, '0', 'count')
+            4
 
     """
     # словарь группирующий элементы из data_list
@@ -226,10 +228,10 @@ def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
     При этом числа не могут содержать в начале 0 (кроме самого нуля).
 
     Args:
-        digits: Список заданных цифр
+        digits (Iterable[int])): Список заданных цифр
 
     Returns:
-        list[int]: Список уникальных комбинаций
+        (list[int]): Список уникальных комбинаций
     """
 
     # Предварительно в результирующий список сохраняем все комбинации
@@ -272,12 +274,12 @@ def closest_amount(
     при условии, что числа из массива могут повторяться.
 
     Args:
-        numbers: Массив чисел
+        numbers (Iterable[int]): Массив чисел
 
-        target: Целевое число
+        target (int): Целевое число
 
     Returns:
-        tuple[int, list]: Кортеж из искомого числа и списка(-ов) наборов чисел,
+        (tuple[int, list]): Кортеж из искомого числа и списка(-ов) наборов чисел,
         сумма которых равна искомому числу.
     """
     # Искомое число и списки чисел, суммы которых равны искомому числу
@@ -338,10 +340,10 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
     Используется только итератор.
 
     Args:
-        iterable: Набор чисел.
+        iterable (Iterable[int]): Набор чисел.
 
     Returns:
-        tuple(min, max): Пара минимального и максимального значений произведения.
+        (tuple(int, int)): Пара минимального и максимального значений произведения.
     """
     result: tuple[TIntNone, TIntNone] = (None, None)
     # Получаем итератор для однократного прохода по элементам данных.
@@ -406,7 +408,7 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
         digits (Iterable[int]): Заданный список целых чисел.
 
     Returns:
-        tuple[int,list[int]]: Количество изменений и список возрастающих чисел.
+        (tuple[int,list[int]]): Количество изменений и список возрастающих чисел.
     """
     # Значение, с которого начинается отсчет
     start = min(digits)
@@ -435,11 +437,11 @@ def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) ->
     """Из заданного набора символов сформировать палиндром.
 
     Args:
-        chars - Список символов.
-        with_separator - Добавлять символ-разделитель. Default: True
+        chars (Iterable[str]): Список символов.
+        with_separator (bool): Добавлять символ-разделитель. Default: True
 
     Returns:
-        str - Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
+        (str): Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
     """
     # Массив для аккумулирования кандидатов символов-разделителей между половинами палиндрома
     separator_candidate = array("u")
@@ -501,7 +503,7 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
         digits (Iterable[TDigit]): Заданный список чисел.
 
     Returns:
-        dict[str, list[tuple[int, int]]]: Словарь, в качестве ключей содержащий минимальную и максимальную
+        (dict[str, list[tuple[int, int]]]): Словарь, в качестве ключей содержащий минимальную и максимальную
         суммы, а в качестве значений список пар диапазонов чисел. Внимание!!! Конечный индекс закрытый и указывает
         на число, входящее в диапазон. Для итерации конечный индекс необходимо нарастить на единицу.
     """
@@ -512,9 +514,12 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
     except StopIteration:
         return dict()  # Если список исходных данных пуст
 
-    class SumMode(str, Enum):
+    class SumMode(Enum):
         MIN = "Min sum: "
         MAX = "Max sum: "
+
+        def __str__(self):
+            return self.value
 
     class Sum:
         """
@@ -603,8 +608,8 @@ def get_minmax_ranges(numbers: Iterable[TNumber]) -> dict[str, TRanges]:
     # Для результирующего словаря в качестве ключей используем строковые значения,
     # т.к. минимальная и максимальная суммы могут быть равны.
     return {
-        f"{min_sum.mode.value}{min_sum.sum}": min_sum.ranges,
-        f"{max_sum.mode.value}{max_sum.sum}": max_sum.ranges,
+        f"{min_sum.mode}{min_sum.sum}": min_sum.ranges,
+        f"{max_sum.mode}{max_sum.sum}": max_sum.ranges,
     }
 
 
