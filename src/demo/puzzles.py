@@ -416,6 +416,9 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list, list]:
     result: list[int | None] = list()
     # Индексы позиций в списке, в которых произошла замена
     positions: list[int] = list()
+    # Используем set, чтобы ускорить поиск по списку уже обработанных элементов
+    # Дополнительные затраты памяти на set - это плата за скорость поиска
+    elements_used: set[int] = set()
     # Итератор позволит работать даже с генераторами.
     it_digits: Iterator[int] = iter(digits)
     try:
@@ -423,23 +426,28 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list, list]:
         # первым элементом входных данных
         begin: int = next(it_digits)
         result.append(begin)
+        elements_used.add(begin)
     except StopIteration:
         return (0, [], [])  # Если список исходных данных пуст
 
     # Стартуем со второго элемента входных данных
     for dig in it_digits:
-        # Дубликаты заменяем None
-        result.append(None if dig in result else dig)
-        # Обновляем значение, с которого начинается результирующий список
-        if dig < begin:
-            begin = dig
+        # Дубликаты заменяем на None
+        if dig in elements_used:
+            result.append(None)
+        else:
+            result.append(dig)
+            elements_used.add(dig)
+            # Обновляем значение, с которого начинается результирующий список
+            if dig < begin:
+                begin = dig
 
     # Значение, которым должен заканчиваться результирующий список
     end: int = (len(result) + begin) - 1
     # Генератор чисел, которые нужно подставить,
     # чтобы получить возрастающий список.
     missing_digits: Generator[int, None, None] = (
-        n for n in range(begin, end + 1) if n not in result
+        n for n in range(begin, end + 1) if n not in elements_used
     )
     # Проверяем каждое значение списка: если значение не входит
     # в результирующий диапазон или продублировано, заменяем его
@@ -668,7 +676,6 @@ def main():
     print(
         "\n- Из заданного набора целых чисел получить список возрастающих чисел за минимальное количество изменений исходного списка."
     )
-    g = (x for x in range(1, 5))
     print(
         f" get_incremental_list([1, 7, 3, 3]) -> {get_incremental_list([1, 7, 3, 3])}"
     )
