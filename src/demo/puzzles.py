@@ -397,7 +397,7 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int], list[int]]:
+def get_incremental_list(digits: Iterable[int]) -> tuple[int, list, list]:
     """Из заданного набора целых чисел получить список возрастающих чисел
     за минимальное количество изменений исходного списка. Возможны как
     положительные, так и отрицательные значения, включая ноль. Сортировка не требуется.
@@ -411,33 +411,45 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int], list[in
         digits (Iterable[int]): Заданный список целых чисел.
 
     Returns:
-        (tuple[int,list[int],list[int]]): Количество изменений, измененные позиции и список возрастающих чисел.
+        (tuple[int,list,list]): Количество изменений, измененные позиции и список возрастающих чисел.
     """
-    # Значение, с которого начинается отсчет
-    if (start := min(digits, default=None)) is None:
-        return (0, [], [])  # Если заданный список пуст
-    # Значение, которым должен заканчиваться результирующий список
-    end = (ilen(digits) + start) - 1
-    # Выясняем сколько и какие числа нужно подставить в исходный список,
-    # чтобы получить возрастающий список. Первый set строит полную
-    # последовательность возрастающих чисел, второй set удаляет те числа,
-    # которые уже присутствуют в исходном списке.
-    missing_digits = set(range(start, end + 1)) - set(digits)
-    # Минимальное количество требуемых изменений
-    cnt = len(missing_digits)
-    # Позиции в списке, в которых произошла замена
-    positions = list()
-    result = list()
-    # Проверяем каждое значение исходного списка: если значение не входит
-    # в результирующий диапазон или продублировано, заменяем его на число
-    # из списка для подстановки
-    for i, val in enumerate(digits):
-        if val > end or val in result:
-            val = missing_digits.pop()
-            positions.append(i)
-        result.append(val)
+    result: list[int | None] = list()
+    # Индексы позиций в списке, в которых произошла замена
+    positions: list[int] = list()
+    # Итератор позволит работать даже с генераторами.
+    it_digits: Iterator[int] = iter(digits)
+    try:
+        # Начальное значение результирующего списка инициализируем
+        # первым элементом входных данных
+        begin: int = next(it_digits)
+        result.append(begin)
+    except StopIteration:
+        return (0, [], [])  # Если список исходных данных пуст
 
-    return (cnt, positions, result)
+    # Стартуем со второго элемента входных данных
+    for dig in it_digits:
+        # Дубликаты заменяем None
+        result.append(None if dig in result else dig)
+        # Обновляем значение, с которого начинается результирующий список
+        if dig < begin:
+            begin = dig
+
+    # Значение, которым должен заканчиваться результирующий список
+    end: int = (len(result) + begin) - 1
+    # Генератор чисел, которые нужно подставить,
+    # чтобы получить возрастающий список.
+    missing_digits: Generator[int, None, None] = (
+        n for n in range(begin, end + 1) if n not in result
+    )
+    # Проверяем каждое значение списка: если значение не входит
+    # в результирующий диапазон или продублировано, заменяем его
+    # на число из генератора для подстановки
+    for i, val in enumerate(result):
+        if val is None or val > end:
+            result[i] = next(missing_digits)
+            positions.append(i)
+
+    return (len(positions), positions, result)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -656,6 +668,7 @@ def main():
     print(
         "\n- Из заданного набора целых чисел получить список возрастающих чисел за минимальное количество изменений исходного списка."
     )
+    g = (x for x in range(1, 5))
     print(
         f" get_incremental_list([1, 7, 3, 3]) -> {get_incremental_list([1, 7, 3, 3])}"
     )

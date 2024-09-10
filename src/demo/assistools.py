@@ -1,5 +1,5 @@
 from collections import Counter, OrderedDict, deque
-from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
 from functools import wraps
 from inspect import Signature, signature
 from itertools import count
@@ -332,7 +332,8 @@ def ilen(iterable: Iterable) -> int:
         int: Количество элементов в данных.
     """
     # Если объект данных поддерживает метод len, то используем встроенный механизм
-    if hasattr(iterable, "__len__"):
+    # if hasattr(iterable, "__len__"): альтернативный вариант
+    if isinstance(iterable, Sized):
         return len(iterable)  # type: ignore
     # Бесконечный счетчик-итератор
     iter_counter = count()
