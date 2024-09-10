@@ -99,7 +99,7 @@ def abs_int(value: Any) -> int:
     try:
         result: int = int(value)
     except (TypeError, ValueError) as exc:
-        raise RuntimeError("The value must support conversion to int.") from exc
+        raise RuntimeError("The 'value' must support conversion to int.") from exc
 
     return (~result + 1) if result < 0 else result
 
@@ -293,7 +293,7 @@ def get_day_week_name(iday: int, imonth: int, iyear: int) -> str:
 
 
 # -------------------------------------------------------------------------------------------------
-def is_includes_elements(data: Iterable, pattern: Iterable) -> bool:
+def is_include_elements(data: Iterable, pattern: Iterable) -> bool:
     """
     Проверяет вхождение одного набора данных в другой. Сортировка не требуется, порядок не важен,
     дублирование элементов допускается, относительный размер списков не принципиален.
@@ -337,7 +337,7 @@ def ilen(iterable: Iterable) -> int:
     # Бесконечный счетчик-итератор
     iter_counter = count()
     # Создаем очередь нулевой длины, которая используется только для наращивания
-    # счетчика iter_counter, и никаких данных не хранит.
+    # счетчика iter_counter и никаких данных не хранит.
     deque(zip(iterable, iter_counter), 0)
     # Возвращаем значение счетчика. Т.к. отсчет ведется с нуля, прибавляем единицу
     return next(iter_counter)
@@ -575,7 +575,7 @@ def main():
 
     print("\n\n- Проверяет вхождение одного набора данных в другой.")
     print(
-        f" is_includes_elements([1, 2, 3, 4, 5, 6, 7, 8, 8], [1, 2, 4, 8]) -> {is_includes_elements([1, 2, 3, 4, 5, 6, 7, 8, 8], [1, 2, 4, 8])}"
+        f" is_includes_elements([1, 2, 3, 4, 5, 6, 7, 8, 8], [1, 2, 4, 8]) -> {is_include_elements([1, 2, 3, 4, 5, 6, 7, 8, 8], [1, 2, 4, 8])}"
     )
 
     print("\n- Перемножение двух целочисленных значений через сложение.")

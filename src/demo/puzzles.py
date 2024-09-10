@@ -5,7 +5,7 @@ from enum import Enum
 from functools import reduce
 from itertools import chain, groupby, permutations
 from math import prod
-from typing import TypeAlias, TypeVar, cast
+from typing import Literal, TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
 # Но это ограничивает независимый запуск файла puzzles.py, который в составе модуля
@@ -117,11 +117,16 @@ def mult_matrix(
 
 
 # --------------------------------------------------------------------------------
+TOperation: TypeAlias = (
+    Literal["Total"] | Literal["Min"] | Literal["Max"] | Literal["Count"]
+)
+
+
 def count_items(
-    data_list: Iterable[T],
+    data_list: Iterable,
     target: str,
     *,
-    operation: str = "Total",
+    operation: TOperation = "Total",
 ) -> int | float | None:
     """
     Функция подсчета количества нахождений заданного элемента в списке (по-умолчанию).
@@ -260,9 +265,7 @@ def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
         results.update(set(permutations(chain((num,), digits_count.elements()))))
 
     # Формируем список результатов и сортируем его для удобства отображения
-    list_results = list(results)
-    list_results.sort()
-    return list_results
+    return sorted(results)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -394,24 +397,25 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
+def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int], list[int]]:
     """Из заданного набора целых чисел получить список возрастающих чисел
     за минимальное количество изменений исходного списка. Возможны как
     положительные, так и отрицательные значения, включая ноль. Сортировка не требуется.
 
     Example:
-    get_incremental_list([1, 7, 3, 3]) -> (2, [1, 2, 3, 4])
-    get_incremental_list([3, 2, 1]) -> (0, [3, 2, 1])
-    get_incremental_list([-2, 0, 4]) -> (1, [-2, 0, -1])
+    get_incremental_list([1, 7, 3, 3]) -> (2, [1, 3], [1, 2, 3, 4])
+    get_incremental_list([3, 2, 1]) -> (0, [], [3, 2, 1])
+    get_incremental_list([-2, 0, 4]) -> (1, [2], [-2, 0, -1])
 
     Args:
         digits (Iterable[int]): Заданный список целых чисел.
 
     Returns:
-        (tuple[int,list[int]]): Количество изменений и список возрастающих чисел.
+        (tuple[int,list[int],list[int]]): Количество изменений, измененные позиции и список возрастающих чисел.
     """
     # Значение, с которого начинается отсчет
-    start = min(digits)
+    if (start := min(digits, default=None)) is None:
+        return (0, [], [])  # Если заданный список пуст
     # Значение, которым должен заканчиваться результирующий список
     end = (ilen(digits) + start) - 1
     # Выясняем сколько и какие числа нужно подставить в исходный список,
@@ -421,15 +425,19 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int]]:
     missing_digits = set(range(start, end + 1)) - set(digits)
     # Минимальное количество требуемых изменений
     cnt = len(missing_digits)
+    # Позиции в списке, в которых произошла замена
+    positions = list()
     result = list()
     # Проверяем каждое значение исходного списка: если значение не входит
     # в результирующий диапазон или продублировано, заменяем его на число
     # из списка для подстановки
-    for val in digits:
+    for i, val in enumerate(digits):
         if val > end or val in result:
             val = missing_digits.pop()
+            positions.append(i)
         result.append(val)
-    return (cnt, result)
+
+    return (cnt, positions, result)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -443,6 +451,7 @@ def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) ->
     Returns:
         (str): Палиндром. Если сформировать палиндром не удалось, возвращается пустая строка.
     """
+    result: str = ""
     # Массив для аккумулирования кандидатов символов-разделителей между половинами палиндрома
     separator_candidate = array("u")
 
@@ -458,16 +467,17 @@ def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) ->
             if _pair_count := (_count >> 1):
                 yield str(_char * _pair_count)
 
-    # Формируем левую половину палиндрома
-    half_palindrome: str = "".join(sorted(_get_palindrome_chars(iter(chars))))
-    if len(half_palindrome):
-        # Определяем символ-разделитель как лексикографически минимальный
-        separator_symbol: str = (
-            min(separator_candidate) if len(separator_candidate) else ""
+    # Собираем результирующий палиндром. Join работает быстрее чем конкатенация
+    if half_palindrome := "".join(sorted(_get_palindrome_chars(iter(chars)))):
+        result = "".join(
+            (
+                half_palindrome,
+                # Определяем символ-разделитель как лексикографически минимальный
+                min(separator_candidate, default=""),
+                half_palindrome[::-1],
+            )
         )
-        # Собираем результирующий палиндром. Join работает быстрее чем конкатенация
-        return "".join((half_palindrome, separator_symbol, half_palindrome[::-1]))
-    return ""
+    return result
 
 
 # -------------------------------------------------------------------------------------------------
@@ -625,6 +635,11 @@ def main():
     )
     print(
         f" get_number_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])) -> {get_min_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])}"
+    )
+
+    print("\n- Подсчет количества нахождений заданного элемента в списке.")
+    print(
+        f" count_items([0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a'], '0') -> {count_items([0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 'a', 'a', 'a'], '0')}"
     )
 
     print("\n- Олимпиадная задача. См. описание в puzzles.py.")

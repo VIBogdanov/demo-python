@@ -3,12 +3,9 @@ from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
-from typing import Any, NamedTuple, TypeAlias, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 from demo import abs_int, is_int, type_checking
-
-T = TypeVar("T")
-TInt: TypeAlias = int | str
 
 
 # ------------------------------------------------------------------------------
@@ -328,7 +325,7 @@ def find_item_by_interpolation(
 
 
 # ----------------------------------------------------------------------------------------------------------
-def sort_by_bubble(elements: Iterable[T], *, revers: bool = False) -> list[T]:
+def sort_by_bubble(elements: Iterable[Any], *, revers: bool = False) -> list[Any]:
     """
     Функция сортировки методом пузырька. В отличии от классического метода, функция за каждую итерацию
     одновременно ищет как максимальное значение, так и минимальное. На следующей итерации диапазон поиска
@@ -484,7 +481,7 @@ def sort_by_merge2(elements: Iterable[Any], *, revers: bool = False) -> list[Any
         query_buff.append(IndexRange(0, (_ln // 2), _ln))
         # Далее делим пополам обе половины до тех пор, пока в каждой половине не останется по два элемента
         while query_buff:
-            i_first, i_middle, i_last = query_buff.popleft()
+            i_first, i_middle, i_last = index_range = query_buff.popleft()
             # Делим пополам левую часть
             if (_md := (i_middle - i_first) // 2) > 0:
                 query_buff.append(IndexRange(i_first, (i_first + _md), i_middle))
@@ -492,7 +489,8 @@ def sort_by_merge2(elements: Iterable[Any], *, revers: bool = False) -> list[Any
             if (_md := (i_last - i_middle) // 2) > 0:
                 query_buff.append(IndexRange(i_middle, (i_middle + _md), i_last))
             # Результирующая очередь будет содержать индексы диапазонов для каждой из половин
-            query_work.append(IndexRange(i_first, i_middle, i_last))
+            query_work.append(index_range)
+        del query_buff
         # Сортируем все полученные половины и собираем из них результирующий отсортированный список
         while query_work:
             # Выбираем из очереди диапазоны начиная с меньших
@@ -515,7 +513,7 @@ def sort_by_merge2(elements: Iterable[Any], *, revers: bool = False) -> list[Any
                     _elements[i_current] = _elements[i_right]
                     i_right += 1
                 else:
-                    # Если текущий и левый индексы указывают на одно и то же, просто смещаем индексы
+                    # Если текущий и левый индексы указывают на одно и то же значение, просто смещаем индексы
                     if i_current != (i_first + i_left):
                         _elements[i_current] = left_list[i_left]
                     i_left += 1
@@ -623,11 +621,11 @@ class GetRangesSort(Iterable):
 
 # --------------------------------------------------------------------------------------------
 def sort_by_shell(
-    elements: Iterable[T],
+    elements: Iterable[Any],
     *,
     revers: bool = False,
     method: SortMethod | str = SortMethod.SHELL,
-) -> list[T]:
+) -> list[Any]:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
     диапазона чисел для перестановки, возможно использовать следующие методы:
@@ -674,7 +672,7 @@ def sort_by_shell(
 
 
 # -------------------------------------------------------------------------------------------------
-def sort_by_selection(elements: Iterable[T], *, revers: bool = False) -> list[T]:  # noqa: C901
+def sort_by_selection(elements: Iterable[Any], *, revers: bool = False) -> list[Any]:
     """
     Функция сортировки методом выбора. Это улучшенный вариант пузырьковой сортировки
     за счет сокращения числа перестановок элементов. Элементы переставляются не на
@@ -825,7 +823,7 @@ def find_pairs_sum(
         (list[tuple[int, int]]): Список пар
     """
     result_list: list[tuple[int, int]] = list()
-    # Удаляем дубли и сортируем входной набор чисел. Сортировка обязательна!!!
+    # Фильтруем не числа, удаляем дубли и сортируем входной набор чисел. Сортировка обязательна!!!
     digits_list: list[int] = sorted(set(int(i) for i in filter(is_int, digits)))
     # Приводим входные параметры к единому типу int
     try:
@@ -834,7 +832,7 @@ def find_pairs_sum(
         return result_list
 
     # Задаем индексы первого и последнего числа списка
-    i_begin = 0
+    i_begin: int = 0
     i_end: int = len(digits_list) - 1
     # Запускаем цикл встречного перебора
     while i_begin <= i_end:
@@ -907,7 +905,7 @@ def main():
 
     print("\n- Поиск неповторяющихся пар чисел, сумма которых равна целевому значению.")
     print(
-        f" find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, 2, -1, 5, 4, 7, 6], 5)}"
+        f" find_pairs_sum([3, 1, 2, 3, 0, -2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, -2, -1, 5, 4, 7, 6], 5)}"
     )
 
 
