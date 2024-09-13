@@ -13,6 +13,7 @@ from demo import ilen
 
 T = TypeVar("T")
 TIntNone: TypeAlias = int | None
+TNumber: TypeAlias = int | float
 
 
 # --------------------------------------------------------------------------------
@@ -45,24 +46,27 @@ def get_min_permutations(source_list: Iterable[T], target_list: Iterable[T]) -> 
     )
     count: int = 0
     # Получаем целевой номер позиции для первого значения из исходного списка
-    prev_item = next(source_index_generator)
+    try:
+        prev_index = next(source_index_generator)
+    except StopIteration:
+        return count  # список пуст
     # Попарно сравниваем целевые номера позиций для значений исходного списка.
     # Если номера позиций не по возрастанию, то требуется перестановка
-    for next_item in source_index_generator:
-        if prev_item > next_item:
+    for next_index in source_index_generator:
+        if prev_index > next_index:
             count += 1
         else:
-            prev_item = next_item
+            prev_index = next_index
 
     return count
 
 
 # --------------------------------------------------------------------------------
 def mult_matrix(
-    matrix: list[list[float | int]],
-    min_val: float | int | None = None,
-    max_val: float | int | None = None,
-    default_val: float | int = 0.0,
+    matrix: list[list[TNumber]],
+    min_val: TNumber | None = None,
+    max_val: TNumber | None = None,
+    default_val: TNumber = 0.0,
 ) -> list[float]:
     """
     Функция получения вектора из двумерной матрицы путем перемножения
@@ -117,9 +121,7 @@ def mult_matrix(
 
 
 # --------------------------------------------------------------------------------
-TOperation: TypeAlias = (
-    Literal["Total"] | Literal["Min"] | Literal["Max"] | Literal["Count"]
-)
+TOperation: TypeAlias = Literal["Total", "Min", "Max", "Count"]
 
 
 def count_items(
@@ -202,7 +204,7 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
     len_lastdig: int = ilen(digits)
-    if (count <= 0) and (pages < count) and (len_lastdig) == 0:
+    if (count <= 0) and (pages < count) and (len_lastdig == 0):
         return 0
 
     # Создаем копию и попутно удаляем дубликаты
@@ -397,7 +399,7 @@ def get_minmax_prod(iterable: Iterable[int]) -> tuple[TIntNone, TIntNone]:
 
 
 # -------------------------------------------------------------------------------------------------
-def get_incremental_list(digits: Iterable[int]) -> tuple[int, list, list]:
+def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int], list]:
     """Из заданного набора целых чисел получить список возрастающих чисел
     за минимальное количество изменений исходного списка. Возможны как
     положительные, так и отрицательные значения, включая ноль. Сортировка не требуется.
@@ -408,27 +410,27 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list, list]:
     get_incremental_list([-2, 0, 4]) -> (1, [2], [-2, 0, -1])
 
     Args:
-        digits (Iterable[int]): Заданный список целых чисел.
+        digits (Iterable): Заданный список целых чисел.
 
     Returns:
         (tuple[int,list,list]): Количество изменений, измененные позиции и список возрастающих чисел.
     """
-    result: list[int | None] = list()
-    # Индексы позиций в списке, в которых произошла замена
-    positions: list[int] = list()
-    # Используем set, чтобы ускорить поиск по списку уже обработанных элементов
-    # Дополнительные затраты памяти на set - это плата за скорость поиска
-    elements_used: set[int] = set()
     # Итератор позволит работать даже с генераторами.
     it_digits: Iterator[int] = iter(digits)
     try:
         # Начальное значение результирующего списка инициализируем
         # первым элементом входных данных
         begin: int = next(it_digits)
-        result.append(begin)
-        elements_used.add(begin)
     except StopIteration:
         return (0, [], [])  # Если список исходных данных пуст
+
+    result: list[int | None] = [begin]
+    # Используем set, чтобы ускорить поиск по списку уже обработанных элементов
+    # Дополнительные затраты памяти на set - это плата за скорость поиска
+    # Если память важнее, вместо elements_used нужно использовать список result
+    elements_used: set[int] = {begin}
+    # Индексы позиций в списке, в которых произошла замена
+    positions: list[int] = list()
 
     # Стартуем со второго элемента входных данных
     for dig in it_digits:
@@ -439,8 +441,7 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list, list]:
             result.append(dig)
             elements_used.add(dig)
             # Обновляем значение, с которого начинается результирующий список
-            if dig < begin:
-                begin = dig
+            begin = min(dig, begin)
 
     # Значение, которым должен заканчиваться результирующий список
     end: int = (len(result) + begin) - 1
@@ -501,7 +502,6 @@ def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) ->
 
 
 # -------------------------------------------------------------------------------------------------
-TNumber = TypeVar("TNumber", int, float)
 TRanges: TypeAlias = list[tuple[int, int]]
 
 
@@ -654,7 +654,7 @@ def main():
         "\n- Минимальное количество перестановок, которое необходимо произвести для выравнивания списков."
     )
     print(
-        f" get_number_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])) -> {get_min_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])}"
+        f" get_min_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])) -> {get_min_permutations([10, 31, 15, 22, 14, 17, 16], [16, 22, 14, 10, 31, 15, 17])}"
     )
 
     print("\n- Подсчет количества нахождений заданного элемента в списке.")

@@ -85,7 +85,7 @@ def get_request(csv_filename: str | Path) -> Generator[Request, None, None]:
             yield Request(
                 req_str,
                 qty_int,
-                set(map(lambda w: w.strip(STRIP_TEMPL).lower(), req_str.split())),
+                set(word.strip(STRIP_TEMPL).lower() for word in req_str.split()),
             )
 
 
@@ -108,7 +108,7 @@ def get_phrase(
     # раскладываем поисковую фразу на отдельные слова и очищаем их
     # используем генератор для будущего однократного прохода без сохранения промежуточных данных
     phrase_words_clear: Generator[str, None, None] = (
-        word for word in map(lambda w: w.strip(STRIP_TEMPL), phrase_string.split())
+        word.strip(STRIP_TEMPL) for word in phrase_string.split()
     )
 
     match compare_type:
