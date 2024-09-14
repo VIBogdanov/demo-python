@@ -375,7 +375,9 @@ class Timer:
     )
 
     def __init__(
-        self, time_source: Callable = perf_counter, is_accumulate: bool = False
+        self,
+        time_source: Callable = perf_counter,
+        is_accumulate: bool = False,
     ) -> None:
         self.__elapsed_time: float = 0.0
         self.__time_source = time_source
@@ -444,11 +446,11 @@ class Timer:
         self.__start_time = None
 
     @property
-    def time_sourse(self):
+    def time_source(self):
         return self.__time_source
 
-    @time_sourse.setter
-    def time_sourse(self, func: Callable) -> None:
+    @time_source.setter
+    def time_source(self, func: Callable) -> None:
         self.__time_source = func
 
     @property
@@ -469,7 +471,7 @@ class Timer:
 
     # Измеренное время между start() и stop()
     @property
-    def elapsed(self) -> float:
+    def elapsed_time(self) -> float:
         if self.__start_time is not None:
             raise RuntimeError("Timer not stopped")
         return self.__elapsed_time
