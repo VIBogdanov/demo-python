@@ -1,5 +1,6 @@
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
+from dataclasses import dataclass
 from functools import wraps
 from inspect import Signature, signature
 from itertools import count
@@ -355,6 +356,27 @@ def is_int(val: Any) -> bool:
 
 
 # -------------------------------------------------------------------------------------------------
+@dataclass(slots=True)
+class ElapsedTime:
+    """Class for keeping elapsed time of Timer class."""
+
+    is_accumulate_timer: bool = False
+    is_show_measured_time: bool = True
+
+    timer_elapsed_time: float = 0.0
+    wrapper_elapsed_time: float = 0.0
+    total_elapsed_time: float = 0.0
+    best_elapsed_time: float = 0.0
+    average_elapsed_time: float = 0.0
+
+    def reset(self) -> None:
+        self.timer_elapsed_time = 0.0
+        self.wrapper_elapsed_time = 0.0
+        self.total_elapsed_time = 0.0
+        self.best_elapsed_time = 0.0
+        self.average_elapsed_time = 0.0
+
+
 class Timer:
     """Класс-таймер, для замеров времени выполнения кода.
     Поддерживает как ручной запуск/останов: start()/stop(), так и менеджер контента 'with'
@@ -369,7 +391,7 @@ class Timer:
         "__elapsed_time",
         "__time_source",
         "__start_time",
-        "__accumulate",
+        "__repeat",
         "__dict__",
         "__weakref__",
     )
@@ -378,11 +400,16 @@ class Timer:
         self,
         time_source: Callable = perf_counter,
         is_accumulate: bool = False,
+        is_show: bool = True,
+        repeat: int = 1000,
     ) -> None:
-        self.__elapsed_time: float = 0.0
-        self.__time_source = time_source
+        self.__time_source: Callable = time_source
+        self.__elapsed_time: ElapsedTime = ElapsedTime(
+            is_accumulate_timer=is_accumulate,
+            is_show_measured_time=is_show,
+        )
+        self.__repeat: int = repeat
         self.__start_time = None
-        self.__accumulate: bool = is_accumulate
 
     # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
     # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
@@ -391,12 +418,7 @@ class Timer:
         @wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
             result: Any = None
-            func_parameters: str = ", ".join(
-                f"{arg_name}={arg_value}"
-                for arg_name, arg_value in signature(func)
-                .bind(*args, **kwargs)
-                .arguments.items()
-            )
+            func_parameters: str = self.__get_func_parameters(func, args, kwargs)
             # Для декоратора используем свои собственные временные метки start и elapsed.
             # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
             # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
@@ -414,17 +436,50 @@ class Timer:
                 # Тонкий момент: можно было бы встроить вычисление elapsed_time прямо в строку форматирования
                 # оператора print, но тогда в измерение интервала времени было бы внесено искажение,
                 # связанное c затратами на формирование отформатированной строки для оператора print
-                elapsed_time = self.__time_source() - start_time
-                print(
-                    f"{func.__module__}.{func.__name__}({func_parameters}) : {elapsed_time}"
+                self.__elapsed_time.wrapper_elapsed_time = (
+                    self.__time_source() - start_time
                 )
+                if self.__elapsed_time.is_show_measured_time:
+                    print(
+                        f"{func.__module__}.{func.__name__}({func_parameters}) call time: {self.__elapsed_time.wrapper_elapsed_time}"
+                    )
             return result
 
         return _wrapper
 
     def __repr__(self) -> str:
-        _cls: str = self.__class__.__name__
-        return f"{_cls}(time_source={self.__time_source!r}, is_accumulate={self.__accumulate!r})"
+        return "".join(
+            (
+                f"{self.__class__.__name__}",
+                f"(time_source={self.__time_source.__module__}.{self.__time_source.__name__}",
+                f", is_accumulate={self.__elapsed_time.is_accumulate_timer!r}",
+                f", is_show={self.__elapsed_time.is_show_measured_time!r}",
+                f", repeat={self.__repeat!r}",
+                ")",
+            )
+        )
+
+    # Для поддержки протокола менеджера контента, реализованы методы __enter__ и __exit__
+    def __enter__(self) -> Self:
+        self.start()
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.stop()
+
+    def __get_func_parameters(
+        self, func: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]
+    ) -> str:
+        func_signature: Signature = signature(func)
+        gen_kwargs: Generator[tuple[str, Any], None, None] = (
+            (k, v) for k, v in kwargs.items() if k in func_signature.parameters.keys()
+        )
+        return ", ".join(
+            f"{arg_name}={arg_value}"
+            for arg_name, arg_value in func_signature.bind(
+                *args, **dict(gen_kwargs)
+            ).arguments.items()
+        )
 
     def start(self) -> None:
         if self.__start_time is not None:
@@ -434,15 +489,19 @@ class Timer:
     def stop(self) -> float:
         if self.__start_time is None:
             raise RuntimeError("Timer not started")
-        if self.__accumulate:
-            self.__elapsed_time += self.__time_source() - self.__start_time
+        if self.__elapsed_time.is_accumulate_timer:
+            self.__elapsed_time.timer_elapsed_time += (
+                self.__time_source() - self.__start_time
+            )
         else:
-            self.__elapsed_time = self.__time_source() - self.__start_time
+            self.__elapsed_time.timer_elapsed_time = (
+                self.__time_source() - self.__start_time
+            )
         self.__start_time = None
-        return self.__elapsed_time
+        return self.__elapsed_time.timer_elapsed_time
 
     def reset(self) -> None:
-        self.__elapsed_time = 0.0
+        self.__elapsed_time.reset()
         self.__start_time = None
 
     @property
@@ -454,15 +513,34 @@ class Timer:
         self.__time_source = func
 
     @property
-    def accumulate(self) -> bool:
-        return self.__accumulate
+    def is_accumulate(self) -> bool:
+        return self.__elapsed_time.is_accumulate_timer
 
-    @accumulate.setter
-    def accumulate(self, value: bool) -> None:
+    @is_accumulate.setter
+    def is_accumulate(self, value: bool) -> None:
         try:
-            self.__accumulate = bool(value)
+            self.__elapsed_time.is_accumulate_timer = bool(value)
         except (TypeError, ValueError) as exc:
-            raise RuntimeError("Accumulate must be bool.") from exc
+            raise RuntimeError("Value must be bool.") from exc
+
+    @property
+    def is_show(self) -> bool:
+        return self.__elapsed_time.is_show_measured_time
+
+    @is_show.setter
+    def is_show(self, value: bool) -> None:
+        try:
+            self.__elapsed_time.is_show_measured_time = bool(value)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("Value must be bool.") from exc
+
+    @property
+    def repeat(self):
+        return self.__repeat
+
+    @repeat.setter
+    def repeat(self, repeat: int) -> None:
+        self.__repeat = repeat
 
     # Признак работающего таймера
     @property
@@ -474,15 +552,107 @@ class Timer:
     def elapsed_time(self) -> float:
         if self.__start_time is not None:
             raise RuntimeError("Timer not stopped")
-        return self.__elapsed_time
+        return self.__elapsed_time.timer_elapsed_time
 
-    # Для поддержки протокола менеджера контента, реализованы методы __enter__ и __exit__
-    def __enter__(self) -> Self:
-        self.start()
-        return self
+    @property
+    def call_elapsed_time(self) -> float:
+        return self.__elapsed_time.wrapper_elapsed_time
 
-    def __exit__(self, *args) -> None:
-        self.stop()
+    @property
+    def total_elapsed_time(self) -> float:
+        return self.__elapsed_time.total_elapsed_time
+
+    @property
+    def best_elapsed_time(self) -> float:
+        return self.__elapsed_time.best_elapsed_time
+
+    def total_repeat(self, func: Callable, *args: Any, **kwargs: Any):
+        _time_source: Callable = kwargs.pop("time_source", self.__time_source)
+        _is_show: Callable = kwargs.pop(
+            "is_show", self.__elapsed_time.is_show_measured_time
+        )
+        _repeat: int = kwargs.pop("repeat", self.__repeat)
+
+        result: Any = None
+        func_parameters: str = self.__get_func_parameters(func, args, kwargs)
+        start_time = _time_source()
+
+        try:
+            for _ in range(_repeat):
+                result = func(*args, **kwargs)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Call error {func.__module__}.{func.__name__}({func_parameters})"
+            ) from exc
+        else:
+            self.__elapsed_time.total_elapsed_time = _time_source() - start_time
+            if _is_show:
+                print(
+                    f"{func.__module__}.{func.__name__}({func_parameters}) total time: {self.total_elapsed_time}"
+                )
+
+        return result
+
+    def best_repeat(self, func: Callable, *args: Any, **kwargs: Any):
+        _time_source: Callable = kwargs.pop("time_source", self.__time_source)
+        _is_show: Callable = kwargs.pop(
+            "is_show", self.__elapsed_time.is_show_measured_time
+        )
+        _repeat: int = kwargs.pop("repeat", self.__repeat)
+
+        result: Any = None
+        func_parameters: str = self.__get_func_parameters(func, args, kwargs)
+        best_time = float("inf")
+
+        try:
+            for _ in range(_repeat):
+                start_time = _time_source()
+                result = func(*args, **kwargs)
+                elapsed_time = _time_source() - start_time
+                if elapsed_time < best_time:
+                    best_time = elapsed_time
+        except Exception as exc:
+            raise RuntimeError(
+                f"Call error {func.__module__}.{func.__name__}({func_parameters})"
+            ) from exc
+        else:
+            self.__elapsed_time.best_elapsed_time = best_time
+            if _is_show:
+                print(
+                    f"{func.__module__}.{func.__name__}({func_parameters}) best time: {self.best_elapsed_time}"
+                )
+
+        return result
+
+    def average_repeat(self, func: Callable, *args: Any, **kwargs: Any):
+        _repeat: int = kwargs.get("repeat", self.__repeat)
+        _is_show: Callable = kwargs.get(
+            "is_show", self.__elapsed_time.is_show_measured_time
+        )
+        kwargs["is_show"] = False
+
+        result: Any = None
+        func_parameters: str = self.__get_func_parameters(func, args, kwargs)
+        _total_elapsed_time: float = self.__elapsed_time.total_elapsed_time
+
+        try:
+            result = self.total_repeat(func, *args, **kwargs)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Call error {func.__module__}.{func.__name__}({func_parameters})"
+            ) from exc
+        else:
+            self.__elapsed_time.average_elapsed_time = (
+                self.__elapsed_time.total_elapsed_time / _repeat
+            )
+            if _is_show:
+                print(
+                    f"{func.__module__}.{func.__name__}({func_parameters}) average time: {self.__elapsed_time.average_elapsed_time}"
+                )
+        finally:
+            self.__elapsed_time.total_elapsed_time = _total_elapsed_time
+
+        return result
 
 
 # -------------------------------------------------------------------------------------------------
@@ -591,6 +761,6 @@ if __name__ == "__main__":
 
     with Timer() as tm:
         res = is_sorted(data)
-    print(f"Общее время выполнения is_sorted({res}):", tm.elapsed)
+    print(f"Общее время выполнения is_sorted({res}):", tm.elapsed_time)
 
     main()
