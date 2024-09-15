@@ -471,13 +471,13 @@ class Timer:
         self, func: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> str:
         func_signature: Signature = signature(func)
-        gen_kwargs: Generator[tuple[str, Any], None, None] = (
+        _kwargs: Generator[tuple[str, Any], None, None] = (
             (k, v) for k, v in kwargs.items() if k in func_signature.parameters.keys()
         )
         return ", ".join(
             f"{arg_name}={arg_value}"
             for arg_name, arg_value in func_signature.bind(
-                *args, **dict(gen_kwargs)
+                *args, **dict(_kwargs)
             ).arguments.items()
         )
 
@@ -566,7 +566,25 @@ class Timer:
     def best_elapsed_time(self) -> float:
         return self.__elapsed_time.best_elapsed_time
 
-    def total_repeat(self, func: Callable, *args: Any, **kwargs: Any):
+    def total_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Вычисляет общее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
+
+        Args:
+            func (Callable): Вызываемый объект для замера времени выполнения
+            *args (Any): Список позиционных аргументов для вызываемого объекта
+            **kwargs (Any): Список именованных аргументов для вызываемого объекта
+            time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
+            repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
+            is_show (bool): Флаг, разрешающий вывод результатов замера на консоль. Default: True
+
+        Raises:
+            RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
+            указанием имени вызываемого объекта и его аргументов.
+
+        Returns:
+            Any: Результат, возвращаемый вызываемым объектом.
+        """
+        # Извлекаем из входных аргументов настроечные параметры для time_source, is_show и repeat
         _time_source: Callable = kwargs.pop("time_source", self.__time_source)
         _is_show: Callable = kwargs.pop(
             "is_show", self.__elapsed_time.is_show_measured_time
@@ -574,6 +592,7 @@ class Timer:
         _repeat: int = kwargs.pop("repeat", self.__repeat)
 
         result: Any = None
+        # Формируем строку с аргументами для вызываемой функции
         func_parameters: str = self.__get_func_parameters(func, args, kwargs)
         start_time = _time_source()
 
@@ -593,7 +612,24 @@ class Timer:
 
         return result
 
-    def best_repeat(self, func: Callable, *args: Any, **kwargs: Any):
+    def best_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Вычисляет лучшее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
+
+        Args:
+            func (Callable): Вызываемый объект для замера времени выполнения
+            *args (Any): Список позиционных аргументов для вызываемого объекта
+            **kwargs (Any): Список именованных аргументов для вызываемого объекта
+            time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
+            repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
+            is_show (bool): Флаг, разрешающий вывод результатов замера на консоль. Default: True
+
+        Raises:
+            RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
+            указанием имени вызываемого объекта и его аргументов.
+
+        Returns:
+            Any: Результат, возвращаемый вызываемым объектом.
+        """
         _time_source: Callable = kwargs.pop("time_source", self.__time_source)
         _is_show: Callable = kwargs.pop(
             "is_show", self.__elapsed_time.is_show_measured_time
@@ -624,15 +660,35 @@ class Timer:
 
         return result
 
-    def average_repeat(self, func: Callable, *args: Any, **kwargs: Any):
+    def average_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Вычисляет среднее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
+
+        Args:
+            func (Callable): Вызываемый объект для замера времени выполнения
+            *args (Any): Список позиционных аргументов для вызываемого объекта
+            **kwargs (Any): Список именованных аргументов для вызываемого объекта
+            time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
+            repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
+            is_show (bool): Флаг, разрешающий вывод результатов замера на консоль. Default: True
+
+        Raises:
+            RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
+            указанием имени вызываемого объекта и его аргументов.
+
+        Returns:
+            Any: Результат, возвращаемый вызываемым объектом.
+        """
+        # Извлекаем, но не удаляем, из входных аргументов настроечные параметры для is_show и repeat
         _repeat: int = kwargs.get("repeat", self.__repeat)
         _is_show: Callable = kwargs.get(
             "is_show", self.__elapsed_time.is_show_measured_time
         )
+        # Т.к. будет вызван метод total_repeat, отключаем для него печать результата
         kwargs["is_show"] = False
 
         result: Any = None
         func_parameters: str = self.__get_func_parameters(func, args, kwargs)
+        # Сохраняем текущее значение total_elapsed_time во временной переменной
         _total_elapsed_time: float = self.__elapsed_time.total_elapsed_time
 
         try:
@@ -650,6 +706,7 @@ class Timer:
                     f"{func.__module__}.{func.__name__}({func_parameters}) average time: {self.__elapsed_time.average_elapsed_time}"
                 )
         finally:
+            # Восстанавливаем значение total_elapsed_time
             self.__elapsed_time.total_elapsed_time = _total_elapsed_time
 
         return result
