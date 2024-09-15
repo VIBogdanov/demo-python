@@ -357,8 +357,8 @@ def is_int(val: Any) -> bool:
 
 # -------------------------------------------------------------------------------------------------
 @dataclass(slots=True)
-class ElapsedTime:
-    """Class for keeping elapsed time of Timer class."""
+class _ElapsedTime:
+    """Private class for keeping elapsed time of Timer class."""
 
     is_accumulate_timer: bool = False
     is_show_measured_time: bool = True
@@ -370,11 +370,11 @@ class ElapsedTime:
     average_elapsed_time: float = 0.0
 
     def reset(self) -> None:
-        self.timer_elapsed_time = 0.0
-        self.wrapper_elapsed_time = 0.0
-        self.total_elapsed_time = 0.0
-        self.best_elapsed_time = 0.0
-        self.average_elapsed_time = 0.0
+        elapsed_times: Generator[str, None, None] = (
+            attr for attr in self.__slots__ if attr.endswith("elapsed_time")
+        )
+        for elapsed_time in elapsed_times:
+            self.__setattr__(elapsed_time, 0.0)
 
 
 class Timer:
@@ -385,6 +385,12 @@ class Timer:
     При инициализации или в процессе использования задаются функция источник времени и
     признак накопления измеренных интервалов. По умолчанию используется time.perf_counter
     и накопление отключено.
+
+    Args:
+        time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
+        is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: False
+        is_show (bool): Флаг, разрешающий вывод результатов замера на консоль. Default: True
+        repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
     """
 
     __slots__ = (
@@ -404,7 +410,7 @@ class Timer:
         repeat: int = 1000,
     ) -> None:
         self.__time_source: Callable = time_source
-        self.__elapsed_time: ElapsedTime = ElapsedTime(
+        self.__elapsed_time: _ElapsedTime = _ElapsedTime(
             is_accumulate_timer=is_accumulate,
             is_show_measured_time=is_show,
         )
@@ -441,7 +447,7 @@ class Timer:
                 )
                 if self.__elapsed_time.is_show_measured_time:
                     print(
-                        f"{func.__module__}.{func.__name__}({func_parameters}) call time: {self.__elapsed_time.wrapper_elapsed_time}"
+                        f"{func.__module__}.{func.__name__}({func_parameters}) call time: {self.call_elapsed_time}"
                     )
             return result
 
@@ -451,10 +457,10 @@ class Timer:
         return "".join(
             (
                 f"{self.__class__.__name__}",
-                f"(time_source={self.__time_source.__module__}.{self.__time_source.__name__}",
-                f", is_accumulate={self.__elapsed_time.is_accumulate_timer!r}",
-                f", is_show={self.__elapsed_time.is_show_measured_time!r}",
-                f", repeat={self.__repeat!r}",
+                f"(time_source={self.time_source.__module__}.{self.time_source.__name__}",
+                f", is_accumulate={self.is_accumulate!r}",
+                f", is_show={self.is_show!r}",
+                f", repeat={self.repeat!r}",
                 ")",
             )
         )
@@ -464,16 +470,21 @@ class Timer:
         self.start()
         return self
 
-    def __exit__(self, *args) -> None:
-        self.stop()
+    def __exit__(self, *exc) -> None:
+        if self.__start_time is not None:
+            self.stop()
 
     def __get_func_parameters(
         self, func: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]
     ) -> str:
         func_signature: Signature = signature(func)
+        # Переупаковываем словарь именованных аргументов, оставляя только те, что заданы
+        # в сигнатуре вызываемого объекта, т.к. дополнительно в списке именованных
+        # аргументов могут присутствовать аргументы специфичные для класса Timer()
         _kwargs: Generator[tuple[str, Any], None, None] = (
             (k, v) for k, v in kwargs.items() if k in func_signature.parameters.keys()
         )
+        # Формируем строку аргументов и их значений, переданных в вызываемый объект
         return ", ".join(
             f"{arg_name}={arg_value}"
             for arg_name, arg_value in func_signature.bind(
@@ -504,13 +515,20 @@ class Timer:
         self.__elapsed_time.reset()
         self.__start_time = None
 
+    def restart(self) -> None:
+        self.__elapsed_time.timer_elapsed_time = 0.0
+        self.__start_time = self.__time_source()
+
     @property
-    def time_source(self):
+    def time_source(self) -> Callable:
         return self.__time_source
 
     @time_source.setter
     def time_source(self, func: Callable) -> None:
-        self.__time_source = func
+        if isinstance(func, Callable):
+            self.__time_source = func
+        else:
+            raise RuntimeError("Value must be Callable.")
 
     @property
     def is_accumulate(self) -> bool:
@@ -535,12 +553,15 @@ class Timer:
             raise RuntimeError("Value must be bool.") from exc
 
     @property
-    def repeat(self):
+    def repeat(self) -> int:
         return self.__repeat
 
     @repeat.setter
-    def repeat(self, repeat: int) -> None:
-        self.__repeat = repeat
+    def repeat(self, value: int) -> None:
+        try:
+            self.__repeat = int(value)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError("Value must be bool.") from exc
 
     # Признак работающего таймера
     @property
@@ -565,6 +586,10 @@ class Timer:
     @property
     def best_elapsed_time(self) -> float:
         return self.__elapsed_time.best_elapsed_time
+
+    @property
+    def average_elapsed_time(self) -> float:
+        return self.__elapsed_time.average_elapsed_time
 
     def total_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет общее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
@@ -703,7 +728,7 @@ class Timer:
             )
             if _is_show:
                 print(
-                    f"{func.__module__}.{func.__name__}({func_parameters}) average time: {self.__elapsed_time.average_elapsed_time}"
+                    f"{func.__module__}.{func.__name__}({func_parameters}) average time: {self.average_elapsed_time}"
                 )
         finally:
             # Восстанавливаем значение total_elapsed_time
