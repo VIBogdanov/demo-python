@@ -1,10 +1,12 @@
+import logging
+import sys
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
 from dataclasses import dataclass
 from functools import wraps
 from inspect import Signature, signature
 from itertools import count
-from logging import Formatter, Logger, StreamHandler, getLogger
+from logging import WARNING, Formatter, Logger, StreamHandler, getLogger
 from multiprocessing import Pool, cpu_count
 from time import perf_counter
 from typing import Any, Self
@@ -391,6 +393,7 @@ class Timer:
         is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: False
         is_show (bool): Флаг, разрешающий вывод результатов замера на консоль. Default: True
         repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
+        logger (Logger | str | None): Вывод результатов замеров. По-умолчанию на консоль. Default: None
     """
 
     __slots__ = (
@@ -398,6 +401,7 @@ class Timer:
         "__time_source",
         "__start_time",
         "__repeat",
+        "__logger",
         "__dict__",
         "__weakref__",
     )
@@ -408,6 +412,8 @@ class Timer:
         is_accumulate: bool = False,
         is_show: bool = True,
         repeat: int = 1000,
+        # Позволяет перенаправить вывод тайминга. По-умолчанию вывод на консоль.
+        logger: logging.Logger | str | None = None,
     ) -> None:
         self.__time_source: Callable = time_source
         self.__elapsed_time: _ElapsedTime = _ElapsedTime(
@@ -416,6 +422,19 @@ class Timer:
         )
         self.__repeat: int = repeat
         self.__start_time = None
+
+        match logger:
+            # Когда передан готовый объект Logger
+            case logging.Logger():
+                self.__logger: logging.Logger = logger
+            # Когда предано имя готового логгера
+            case str():
+                self.__logger: logging.Logger = self.__get_loginfo(logger)
+            # Иначе создаем свой собственный логгер
+            case _:
+                self.__logger: logging.Logger = self.__get_loginfo(
+                    self.__class__.__name__
+                )
 
     # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
     # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
@@ -445,9 +464,9 @@ class Timer:
                 self.__elapsed_time.wrapper_elapsed_time = (
                     self.__time_source() - start_time
                 )
-                if self.__elapsed_time.is_show_measured_time:
-                    print(
-                        f"{func.__module__}.{func.__name__}({func_parameters}) call time: {self.call_elapsed_time}"
+                if self.is_show:
+                    self.__logger.info(
+                        f"{func.__module__}.{func.__name__}({func_parameters}) call time: {self.__elapsed_time.wrapper_elapsed_time}"
                     )
             return result
 
@@ -461,6 +480,7 @@ class Timer:
                 f", is_accumulate={self.is_accumulate!r}",
                 f", is_show={self.is_show!r}",
                 f", repeat={self.repeat!r}",
+                f", logger={self.__logger!r}",
                 ")",
             )
         )
@@ -471,6 +491,7 @@ class Timer:
         return self
 
     def __exit__(self, *exc) -> None:
+        # Внутри контентного менеджера возможен вызов self.reset()
         if self.__start_time is not None:
             self.stop()
 
@@ -491,6 +512,22 @@ class Timer:
                 *args, **dict(_kwargs)
             ).arguments.items()
         )
+
+    def __get_loginfo(self, logger_name: str) -> logging.Logger:
+        logger: logging.Logger = logging.getLogger(logger_name)
+        # Если текущего уровня надостаточно
+        if logger.getEffectiveLevel() > logging.INFO:
+            logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler(stream=sys.stdout)
+        formatter = logging.Formatter(
+            "{asctime} {name} [{levelname}]: {message}",
+            datefmt="%d-%m-%Y %H:%M:%S",
+            style="{",
+        )
+        handler.setLevel(logging.INFO)  # Необязательно
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return logger
 
     def start(self) -> None:
         if self.__start_time is not None:
@@ -611,9 +648,7 @@ class Timer:
         """
         # Извлекаем из входных аргументов настроечные параметры для time_source, is_show и repeat
         _time_source: Callable = kwargs.pop("time_source", self.__time_source)
-        _is_show: Callable = kwargs.pop(
-            "is_show", self.__elapsed_time.is_show_measured_time
-        )
+        _is_show: Callable = kwargs.pop("is_show", self.is_show)
         _repeat: int = kwargs.pop("repeat", self.__repeat)
 
         result: Any = None
@@ -631,7 +666,7 @@ class Timer:
         else:
             self.__elapsed_time.total_elapsed_time = _time_source() - start_time
             if _is_show:
-                print(
+                self.__logger.info(
                     f"{func.__module__}.{func.__name__}({func_parameters}) total time: {self.total_elapsed_time}"
                 )
 
@@ -656,9 +691,7 @@ class Timer:
             Any: Результат, возвращаемый вызываемым объектом.
         """
         _time_source: Callable = kwargs.pop("time_source", self.__time_source)
-        _is_show: Callable = kwargs.pop(
-            "is_show", self.__elapsed_time.is_show_measured_time
-        )
+        _is_show: Callable = kwargs.pop("is_show", self.is_show)
         _repeat: int = kwargs.pop("repeat", self.__repeat)
 
         result: Any = None
@@ -679,7 +712,7 @@ class Timer:
         else:
             self.__elapsed_time.best_elapsed_time = best_time
             if _is_show:
-                print(
+                self.__logger.info(
                     f"{func.__module__}.{func.__name__}({func_parameters}) best time: {self.best_elapsed_time}"
                 )
 
@@ -705,9 +738,7 @@ class Timer:
         """
         # Извлекаем, но не удаляем, из входных аргументов настроечные параметры для is_show и repeat
         _repeat: int = kwargs.get("repeat", self.__repeat)
-        _is_show: Callable = kwargs.get(
-            "is_show", self.__elapsed_time.is_show_measured_time
-        )
+        _is_show: Callable = kwargs.get("is_show", self.is_show)
         # Т.к. будет вызван метод total_repeat, отключаем для него печать результата
         kwargs["is_show"] = False
 
@@ -727,7 +758,7 @@ class Timer:
                 self.__elapsed_time.total_elapsed_time / _repeat
             )
             if _is_show:
-                print(
+                self.__logger.info(
                     f"{func.__module__}.{func.__name__}({func_parameters}) average time: {self.average_elapsed_time}"
                 )
         finally:
@@ -743,7 +774,8 @@ class WarningToConsole:
 
     def __init__(self, msg: str | None = None, logname: str | None = None) -> None:
         self.__logger: Logger = getLogger(__name__ if logname is None else logname)
-        _handler = StreamHandler()
+        _handler = StreamHandler(sys.stdout)
+        _handler.setLevel(WARNING)
         _formatter = Formatter(
             "{asctime} [{levelname}] - {message}"
             if logname is None
@@ -841,8 +873,8 @@ def main():
 if __name__ == "__main__":
     data = range(100_000_000)
 
-    with Timer() as tm:
-        res = is_sorted(data)
-    print(f"Общее время выполнения is_sorted({res}):", tm.elapsed_time)
+    # with Timer() as tm:
+    #    res = is_sorted(data)
+    # print(f"Общее время выполнения is_sorted({res}):", tm.elapsed_time)
 
     main()

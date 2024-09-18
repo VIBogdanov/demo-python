@@ -3,7 +3,8 @@ from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
-from typing import Any, NamedTuple, TypeVar
+from operator import __mod__
+from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar
 
 from demo import abs_int, is_int, type_checking
 
@@ -526,6 +527,9 @@ def sort_by_merge2(elements: Iterable[Any], *, revers: bool = False) -> list[Any
 
 
 # --------------------------------------------------------------------------------------------
+TSortMethod: TypeAlias = Literal["Shell", "Hibbard", "Sedgewick", "Knuth", "Fibonacci"]
+
+
 class SortMethod(str, Enum):
     SHELL = "Shell"
     HIBBARD = "Hibbard"
@@ -534,7 +538,7 @@ class SortMethod(str, Enum):
     FIBONACCI = "Fibonacci"
 
 
-class GetRangesSort(Iterable):
+class _GetRangesSort(Iterable):
     """
     Вспомогательный класс для функции sort_by_shell(). Реализует различные методы формирования
     диапазонов чисел для перестановки. Класс является итератором.
@@ -549,7 +553,7 @@ class GetRangesSort(Iterable):
     __slots__ = "__calc_res"
 
     def __init__(
-        self, list_len: int, method: SortMethod | str = SortMethod.SHELL
+        self, list_len: int, method: SortMethod | TSortMethod = SortMethod.SHELL
     ) -> None:
         self.__calc_res: list[int] = list()
         # Исходя из заданного метода, вычисляем на какие диапазоны можно разбить исходный список
@@ -624,7 +628,7 @@ def sort_by_shell(
     elements: Iterable[Any],
     *,
     revers: bool = False,
-    method: SortMethod | str = SortMethod.SHELL,
+    method: SortMethod | TSortMethod = SortMethod.SHELL,
 ) -> list[Any]:
     """
     Функция сортировки методом Shell. Кроме классического метода формирования
@@ -654,7 +658,7 @@ def sort_by_shell(
 
     if (len(_elements)) > 1:
         # Создаем экземпляр класса, который будет генерировать диапазоны выборки
-        for range_item in GetRangesSort(len(_elements), method):
+        for range_item in _GetRangesSort(len(_elements), method):
             for i_range in range(range_item, len(_elements)):
                 i_current: int = i_range
                 while (i_current >= range_item) and (
