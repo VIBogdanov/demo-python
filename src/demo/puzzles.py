@@ -9,7 +9,7 @@ from typing import Literal, TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
 # Но это ограничивает независимый запуск файла puzzles.py, который в составе модуля
-from demo import ilen
+import demo
 
 T = TypeVar("T")
 TIntNone: TypeAlias = int | None
@@ -203,7 +203,7 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     Returns:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
-    len_lastdig: int = ilen(digits)
+    len_lastdig: int = demo.ilen(digits)
     if (count <= 0) and (pages < count) and (len_lastdig == 0):
         return 0
 
@@ -244,7 +244,7 @@ def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
     # Предварительно в результирующий список сохраняем все комбинации
     # из одиночных цифр исходного списка и удаляем дубли
     results = set(permutations(digits))
-    range_size = ilen(digits) + 1
+    range_size = demo.ilen(digits) + 1
     # Формируем генератор, который из цифр списка составляет двухзначные, трехзначные и т.д. числа
     # Т.к. числа, состоящие из одной цифры, уже обработаны, начинаем с двухзначных чисел
     gen_digits_list: Generator[tuple[int, ...], None, None] = (

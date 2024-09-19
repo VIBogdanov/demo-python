@@ -26,7 +26,7 @@ from typing import NamedTuple
 
 from pandas import DataFrame, ExcelWriter
 
-from demo import WarningToConsole
+import demo
 
 STRIP_TEMPL = r"""_ .,:;"'!?-+=*()[]{}\|/"""
 BUFFER_SIZE = 1024 * 100
@@ -240,7 +240,7 @@ def main():
     # Чтобы работать в текущей папке: DIR_NAME = r""
     csv_filename = Path(Path(__file__).parent, DIR_NAME, CSV_NAME).resolve()
     if not csv_filename.exists():
-        WarningToConsole(f"The file {csv_filename} does not exists!")
+        demo.WarningToConsole(f"The file {csv_filename} does not exists!")
         return
     # Файл Excel сохраняем рядом с csv в той же папке с тем же именем
     excel_filename = csv_filename.with_suffix(".xlsx")
@@ -285,9 +285,9 @@ def main():
                     )
                     dfw.to_excel(xls_writer, sheet_name="words", index=False)
         else:
-            WarningToConsole("The request selection is empty!")
+            demo.WarningToConsole("The request selection is empty!")
     else:
-        WarningToConsole("Function 'check_request' not defined!")
+        demo.WarningToConsole("Function 'check_request' not defined!")
 
 
 if __name__ == "__main__":

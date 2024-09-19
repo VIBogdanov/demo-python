@@ -3,10 +3,9 @@ from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
 from functools import reduce
 from itertools import accumulate
-from operator import __mod__
 from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar
 
-from demo import abs_int, is_int, type_checking
+import demo
 
 
 # ------------------------------------------------------------------------------
@@ -152,7 +151,7 @@ def _do_find_nearest(
 
     """
     # создаем копию передаваемого списка, дабы не влиять на оригинальный список
-    _digits_list: list[int] = list(filter(is_int, digits_list))
+    _digits_list: list[int] = list(filter(demo.is_int, digits_list))
 
     i: int = current_index  # текущая позиция исходного числа, относительно которой ведется поиск
     for k in range(i - 1, -1, -1):  # просматриваем все цифры левее текущей позиции
@@ -773,7 +772,7 @@ def sort_by_selection(elements: Iterable[Any], *, revers: bool = False) -> list[
 TNumber = TypeVar("TNumber", int, str)
 
 
-@type_checking(TNumber.__constraints__, TNumber.__constraints__)
+@demo.type_checking(TNumber.__constraints__, TNumber.__constraints__)
 def get_common_divisor(number_a: TNumber, number_b: TNumber) -> int | None:
     """
     Алгоритм нахождения наибольшего общего делителя двух целых чисел без перебора.
@@ -795,8 +794,8 @@ def get_common_divisor(number_a: TNumber, number_b: TNumber) -> int | None:
     Returns:
         int: Наибольший общий делитель. Если делитель равен 0, возвращает None.
     """
-    divisible: int = abs_int(number_a)
-    divisor: int = abs_int(number_b)
+    divisible: int = demo.abs_int(number_a)
+    divisor: int = demo.abs_int(number_b)
     # Определяем делимое и делитель. Делимое - большее число. Делитель - меньшее.
     if divisor > divisible:
         divisible, divisor = divisor, divisible
@@ -828,7 +827,7 @@ def find_pairs_sum(
     """
     result_list: list[tuple[int, int]] = list()
     # Фильтруем не числа, удаляем дубли и сортируем входной набор чисел. Сортировка обязательна!!!
-    digits_list: list[int] = sorted(set(int(i) for i in filter(is_int, digits)))
+    digits_list: list[int] = sorted(set(int(i) for i in filter(demo.is_int, digits)))
     # Приводим входные параметры к единому типу int
     try:
         _target: int = int(target)

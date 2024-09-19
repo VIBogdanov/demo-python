@@ -1,17 +1,20 @@
+import dataclasses
+import functools
+import inspect
+import itertools
 import logging
+import multiprocessing
 import sys
+import time
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
-from dataclasses import dataclass
-from functools import wraps
-from inspect import Signature, signature
-from itertools import count
-from logging import WARNING, Formatter, Logger, StreamHandler, getLogger
-from multiprocessing import Pool, cpu_count
-from time import perf_counter
-from typing import Any, Self
+from logging import Formatter  # , Logger#, StreamHandler
+from typing import Any, Literal, Self, TypeAlias
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
+
+TSignature: TypeAlias = inspect.Signature
+TLogger: TypeAlias = logging.Logger
 
 
 # ---------------------Decorators-------------------------------------------------------
@@ -44,12 +47,12 @@ def type_checking(*type_args, **type_kwargs):
         if not __debug__:
             return func
         # Формируем словарь, связывающий арнументы функции с требованиями типов, заданными в декораторе
-        func_signature: Signature = signature(func)
+        func_signature: TSignature = inspect.signature(func)
         args_types: OrderedDict[str, Any] = func_signature.bind_partial(
             *type_args, **type_kwargs
         ).arguments
 
-        @wraps(func)
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Формируем словарь с именами преданных функции аргументов и их значениями
             for arg_name, arg_value in func_signature.bind(
@@ -210,7 +213,7 @@ def is_sorted(
     if (len_elements := len(elements)) < 2:
         return True
 
-    cpu: int = cpu_count()
+    cpu: int = multiprocessing.cpu_count()
     result: bool = True  # По умолчанию считаем список отсортированным
 
     # Если размер диапазона не задан, вычисляем исходя из производительности CPU
@@ -240,7 +243,7 @@ def is_sorted(
         # Запускаем пул параллельных процессов для проверки сортировки набора диапазонов
         # - результаты получаем сразу по готовности не дожидаясь завершения всех проверок
         # - возможно досрочное завершение обработки результатов
-        with Pool(processes=min(cpu, ranges_count)) as mpool:
+        with multiprocessing.Pool(processes=min(cpu, ranges_count)) as mpool:
             # Загружаем задачи в пул и запускаем итератор для получения результатов по мере готовности
             for result in mpool.imap_unordered(_is_srt, margs_list):
                 # Если один из результатов False, останавливаем цикл получения результатов
@@ -339,7 +342,7 @@ def ilen(iterable: Iterable) -> int:
     if isinstance(iterable, Sized):
         return len(iterable)  # type: ignore
     # Бесконечный счетчик-итератор
-    iter_counter = count()
+    iter_counter = itertools.count()
     # Создаем очередь нулевой длины, которая используется только для наращивания
     # счетчика iter_counter и никаких данных не хранит.
     deque(zip(iterable, iter_counter), 0)
@@ -358,7 +361,7 @@ def is_int(val: Any) -> bool:
 
 
 # -------------------------------------------------------------------------------------------------
-@dataclass(slots=True)
+@dataclasses.dataclass(slots=True)
 class _ElapsedTime:
     """Private class for keeping elapsed time of Timer class."""
 
@@ -379,7 +382,10 @@ class _ElapsedTime:
             self.__setattr__(elapsed_time, 0.0)
 
 
-class Timer:
+TTimerType: TypeAlias = Literal["Total", "Best", "Average"]
+
+
+class Timers:
     """Класс-таймер, для замеров времени выполнения кода.
     Поддерживает как ручной запуск/останов: start()/stop(), так и менеджер контента 'with'
     и декорирование @Timer().
@@ -408,12 +414,12 @@ class Timer:
 
     def __init__(
         self,
-        time_source: Callable = perf_counter,
+        time_source: Callable = time.perf_counter,
         is_accumulate: bool = False,
         is_show: bool = True,
         repeat: int = 1000,
         # Позволяет перенаправить вывод тайминга. По-умолчанию вывод на консоль.
-        logger: logging.Logger | str | None = None,
+        logger: TLogger | str | None = None,
     ) -> None:
         self.__time_source: Callable = time_source
         self.__elapsed_time: _ElapsedTime = _ElapsedTime(
@@ -425,30 +431,28 @@ class Timer:
 
         match logger:
             # Когда передан готовый объект Logger
-            case logging.Logger():
-                self.__logger: logging.Logger = logger
+            case TLogger():
+                self.__logger: TLogger = logger
             # Когда предано имя готового логгера
             case str():
-                self.__logger: logging.Logger = self.__get_loginfo(logger)
+                self.__logger: TLogger = self.__get_loginfo(logger)
             # Иначе создаем свой собственный логгер
             case _:
-                self.__logger: logging.Logger = self.__get_loginfo(
-                    self.__class__.__name__
-                )
+                self.__logger: TLogger = self.__get_loginfo(self.__class__.__name__)
 
     # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
     # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
     # Возможно задать и параметр is_accumulate, но он будет проигнорирован
     def __call__(self, func: Callable):
-        @wraps(func)
+        @functools.wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
             result: Any = None
-            func_parameters: str = self.__get_func_parameters(func, args, kwargs)
+            func_parameters: str = self.get_func_parameters(func, *args, **kwargs)
             # Для декоратора используем свои собственные временные метки start и elapsed.
             # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
             # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
-            start_time = self.__time_source()
             try:
+                start_time = self.__time_source()
                 result = func(*args, **kwargs)
             except Exception as exc:
                 raise RuntimeError(
@@ -458,15 +462,15 @@ class Timer:
                 # При измерении интервала времени для декоратора аккумулирование не используется.
                 # Для декоратора накопление не имеет смысла, т.к. измеряется конкретная функция
                 # в конкретный момент ее вызова
-                # Тонкий момент: можно было бы встроить вычисление elapsed_time прямо в строку форматирования
-                # оператора print, но тогда в измерение интервала времени было бы внесено искажение,
-                # связанное c затратами на формирование отформатированной строки для оператора print
+                # Тонкий момент: можно было бы встроить вычисление elapsed_time прямо в строку форматирования,
+                # но тогда в измерение интервала времени было бы внесено искажение,
+                # связанное c затратами на формирование отформатированной строки
                 self.__elapsed_time.wrapper_elapsed_time = (
                     self.__time_source() - start_time
                 )
                 if self.is_show:
                     self.__logger.info(
-                        f"{func.__module__}.{func.__name__}({func_parameters}) call time: {self.__elapsed_time.wrapper_elapsed_time}"
+                        f"Call time [{func.__module__}.{func.__name__}({func_parameters}) -> {result}] = {self.call_elapsed_time}"
                     )
             return result
 
@@ -495,10 +499,9 @@ class Timer:
         if self.__start_time is not None:
             self.stop()
 
-    def __get_func_parameters(
-        self, func: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]
-    ) -> str:
-        func_signature: Signature = signature(func)
+    @staticmethod
+    def get_func_parameters(func: Callable, *args: Any, **kwargs: Any) -> str:
+        func_signature: TSignature = inspect.signature(func)
         # Переупаковываем словарь именованных аргументов, оставляя только те, что заданы
         # в сигнатуре вызываемого объекта, т.к. дополнительно в списке именованных
         # аргументов могут присутствовать аргументы специфичные для класса Timer()
@@ -513,8 +516,9 @@ class Timer:
             ).arguments.items()
         )
 
-    def __get_loginfo(self, logger_name: str) -> logging.Logger:
-        logger: logging.Logger = logging.getLogger(logger_name)
+    @staticmethod
+    def __get_loginfo(logger_name: str) -> TLogger:
+        logger: TLogger = logging.getLogger(logger_name)
         # Если текущего уровня надостаточно
         if logger.getEffectiveLevel() > logging.INFO:
             logger.setLevel(logging.INFO)
@@ -628,7 +632,219 @@ class Timer:
     def average_elapsed_time(self) -> float:
         return self.__elapsed_time.average_elapsed_time
 
-    def total_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    class get_times:
+        """Вычисляет лучшее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
+        Вызывается как метод класса Timer.get_best_time без создания экземпляра класса Timer.
+
+        Args:
+            func (Callable): Вызываемый объект для замера времени выполнения
+            *args (Any): Список позиционных аргументов для вызываемого объекта
+            **kwds (Any): Список именованных аргументов для вызываемого объекта
+            time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
+            repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
+            type (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Default: Total
+
+        Raises:
+            RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
+            указанием имени вызываемого объекта и его аргументов.
+        """
+
+        time_source: Callable = time.perf_counter
+        repeat: int = 1000
+        type: TTimerType = "Total"
+
+        __slots__ = ("__result", "__time", "__formatted_str", "__func_parameters")
+
+        def __init__(
+            self,
+            func: Callable,
+            *args: Any,
+            time_source: Callable = time.perf_counter,
+            repeat: int = 1000,
+            type: TTimerType = "Total",
+            **kwds: Any,
+        ) -> None:
+            self.__class__.time_source = time_source
+            self.__class__.repeat = repeat
+            self.__class__.type = type
+            self.__result: Any = None
+            self.__time: float = float("inf")
+            self.__formatted_str: str = ""
+            self.__call__(func, *args, **kwds)
+
+        def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
+            self.__func_parameters: str = Timers.get_func_parameters(
+                func, *args, **kwds
+            )
+            match self.__class__.type:
+                case "Total":
+                    self.__total_time(func, args, kwds)
+                case "Best":
+                    self.__best_time(func, args, kwds)
+                case "Average":
+                    self.__average_time(func, args, kwds)
+
+            return self.result
+
+        def __str__(self) -> str:
+            return self.__formatted_str
+
+        def __total_time(self, func: Callable, args: Any, kwds: Any) -> None:
+            result: Any = None
+
+            try:
+                start_time: float = self.__class__.time_source()
+                for _ in range(self.__class__.repeat):
+                    result = func(*args, **kwds)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Call error {func.__module__}.{func.__name__}({self.__func_parameters})"
+                ) from exc
+            else:
+                # Обновляем через промежуточные переменные, дабы защититься от сбоя в блоке try и
+                # не остаться в неопределенном состоянии. Обновляем только в случае полного успеха.
+                self.__time = self.__class__.time_source() - start_time
+                self.__result = result
+                self.__formatted_str = f"Total time [{func.__module__}.{func.__name__}({self.__func_parameters}) -> {self.result}] = {self.time}"
+
+        def __best_time(self, func: Callable, args: Any, kwds: Any) -> None:
+            result: Any = None
+            best_time: float = float("inf")
+            try:
+                for _ in range(self.__class__.repeat):
+                    start_time: float = self.__class__.time_source()
+                    result = func(*args, **kwds)
+                    elapsed_time: float = self.__class__.time_source() - start_time
+                    if elapsed_time < best_time:
+                        best_time = elapsed_time
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Call error {func.__module__}.{func.__name__}({self.__func_parameters})"
+                ) from exc
+            else:
+                # Обновляем через промежуточные переменные, дабы защититься от сбоя в блоке try и
+                # не остаться в неопределенном состоянии. Обновляем только в случае полного успеха.
+                self.__time = best_time
+                self.__result = result
+                self.__formatted_str = f"Best time [{func.__module__}.{func.__name__}({self.__func_parameters}) -> {self.result}] = {self.time}"
+
+        def __average_time(self, func: Callable, args: Any, kwds: Any) -> None:
+            try:
+                self.__total_time(func, args, kwds)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Call error {func.__module__}.{func.__name__}({self.__func_parameters})"
+                ) from exc
+            else:
+                self.__time = self.__time / self.__class__.repeat
+                self.__formatted_str = f"Average time [{func.__module__}.{func.__name__}({self.__func_parameters}) -> {self.result}] = {self.time}"
+
+        @property
+        def result(self) -> Any:
+            return self.__result
+
+        @property
+        def time(self) -> float:
+            return self.__time
+
+        @property
+        def log(self) -> str:
+            return self.__formatted_str
+
+    @classmethod
+    def get_total_time(
+        cls,
+        func: Callable,
+        *args: Any,
+        time_source: Callable = time.perf_counter,
+        repeat: int = 1000,
+        **kwargs: Any,
+    ):
+        return cls.get_times(
+            func,
+            *args,
+            **kwargs,
+            time_source=time_source,
+            repeat=repeat,
+            type="Total",
+        )
+
+    @classmethod
+    def get_best_time(
+        cls,
+        func: Callable,
+        *args: Any,
+        time_source: Callable = time.perf_counter,
+        repeat: int = 1000,
+        **kwargs: Any,
+    ):
+        return cls.get_times(
+            func,
+            *args,
+            **kwargs,
+            time_source=time_source,
+            repeat=repeat,
+            type="Best",
+        )
+
+    @classmethod
+    def get_average_time(
+        cls,
+        func: Callable,
+        *args: Any,
+        time_source: Callable = time.perf_counter,
+        repeat: int = 1000,
+        **kwargs: Any,
+    ):
+        return cls.get_times(
+            func,
+            *args,
+            **kwargs,
+            time_source=time_source,
+            repeat=repeat,
+            type="Average",
+        )
+
+    def __times(
+        self,
+        func: Callable,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        type: TTimerType,
+    ):
+        # Извлекаем из входных аргументов настроечные параметры для time_source, is_show и repeat
+        _time_source: Callable = kwargs.pop("time_source", self.time_source)
+        _is_show: Callable = kwargs.pop("is_show", self.is_show)
+        _repeat: int = kwargs.pop("repeat", self.repeat)
+
+        try:
+            _time = self.get_times(
+                func,
+                *args,
+                **kwargs,
+                time_source=_time_source,
+                repeat=_repeat,
+                type=type,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Call error {func.__module__}.{func.__name__}({self.get_func_parameters(func, *args, **kwargs)})"
+            ) from exc
+        else:
+            match type:
+                case "Total":
+                    self.__elapsed_time.total_elapsed_time = _time.time
+                case "Best":
+                    self.__elapsed_time.best_elapsed_time = _time.time
+                case "Average":
+                    self.__elapsed_time.average_elapsed_time = _time.time
+
+            if _is_show:
+                self.__logger.info(_time)
+
+        return _time.result
+
+    def total_time(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет общее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
 
         Args:
@@ -646,33 +862,9 @@ class Timer:
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
         """
-        # Извлекаем из входных аргументов настроечные параметры для time_source, is_show и repeat
-        _time_source: Callable = kwargs.pop("time_source", self.__time_source)
-        _is_show: Callable = kwargs.pop("is_show", self.is_show)
-        _repeat: int = kwargs.pop("repeat", self.__repeat)
+        return self.__times(func, args, kwargs, type="Total")
 
-        result: Any = None
-        # Формируем строку с аргументами для вызываемой функции
-        func_parameters: str = self.__get_func_parameters(func, args, kwargs)
-        start_time = _time_source()
-
-        try:
-            for _ in range(_repeat):
-                result = func(*args, **kwargs)
-        except Exception as exc:
-            raise RuntimeError(
-                f"Call error {func.__module__}.{func.__name__}({func_parameters})"
-            ) from exc
-        else:
-            self.__elapsed_time.total_elapsed_time = _time_source() - start_time
-            if _is_show:
-                self.__logger.info(
-                    f"{func.__module__}.{func.__name__}({func_parameters}) total time: {self.total_elapsed_time}"
-                )
-
-        return result
-
-    def best_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    def best_time(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет лучшее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
 
         Args:
@@ -690,35 +882,9 @@ class Timer:
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
         """
-        _time_source: Callable = kwargs.pop("time_source", self.__time_source)
-        _is_show: Callable = kwargs.pop("is_show", self.is_show)
-        _repeat: int = kwargs.pop("repeat", self.__repeat)
+        return self.__times(func, args, kwargs, type="Best")
 
-        result: Any = None
-        func_parameters: str = self.__get_func_parameters(func, args, kwargs)
-        best_time = float("inf")
-
-        try:
-            for _ in range(_repeat):
-                start_time = _time_source()
-                result = func(*args, **kwargs)
-                elapsed_time = _time_source() - start_time
-                if elapsed_time < best_time:
-                    best_time = elapsed_time
-        except Exception as exc:
-            raise RuntimeError(
-                f"Call error {func.__module__}.{func.__name__}({func_parameters})"
-            ) from exc
-        else:
-            self.__elapsed_time.best_elapsed_time = best_time
-            if _is_show:
-                self.__logger.info(
-                    f"{func.__module__}.{func.__name__}({func_parameters}) best time: {self.best_elapsed_time}"
-                )
-
-        return result
-
-    def average_repeat(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    def average_time(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет среднее время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
 
         Args:
@@ -736,36 +902,7 @@ class Timer:
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
         """
-        # Извлекаем, но не удаляем, из входных аргументов настроечные параметры для is_show и repeat
-        _repeat: int = kwargs.get("repeat", self.__repeat)
-        _is_show: Callable = kwargs.get("is_show", self.is_show)
-        # Т.к. будет вызван метод total_repeat, отключаем для него печать результата
-        kwargs["is_show"] = False
-
-        result: Any = None
-        func_parameters: str = self.__get_func_parameters(func, args, kwargs)
-        # Сохраняем текущее значение total_elapsed_time во временной переменной
-        _total_elapsed_time: float = self.__elapsed_time.total_elapsed_time
-
-        try:
-            result = self.total_repeat(func, *args, **kwargs)
-        except Exception as exc:
-            raise RuntimeError(
-                f"Call error {func.__module__}.{func.__name__}({func_parameters})"
-            ) from exc
-        else:
-            self.__elapsed_time.average_elapsed_time = (
-                self.__elapsed_time.total_elapsed_time / _repeat
-            )
-            if _is_show:
-                self.__logger.info(
-                    f"{func.__module__}.{func.__name__}({func_parameters}) average time: {self.average_elapsed_time}"
-                )
-        finally:
-            # Восстанавливаем значение total_elapsed_time
-            self.__elapsed_time.total_elapsed_time = _total_elapsed_time
-
-        return result
+        return self.__times(func, args, kwargs, type="Average")
 
 
 # -------------------------------------------------------------------------------------------------
@@ -773,18 +910,20 @@ class WarningToConsole:
     __slots__ = "__logger"
 
     def __init__(self, msg: str | None = None, logname: str | None = None) -> None:
-        self.__logger: Logger = getLogger(__name__ if logname is None else logname)
-        _handler = StreamHandler(sys.stdout)
-        _handler.setLevel(WARNING)
-        _formatter = Formatter(
+        self.__logger: TLogger = logging.getLogger(
+            __name__ if logname is None else logname
+        )
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.WARNING)
+        formatter = Formatter(
             "{asctime} [{levelname}] - {message}"
             if logname is None
             else "{asctime} [{levelname}] — {name} - {message}",
             datefmt="%d-%m-%Y %H:%M:%S",
             style="{",
         )
-        _handler.setFormatter(_formatter)
-        self.__logger.addHandler(_handler)
+        handler.setFormatter(formatter)
+        self.__logger.addHandler(handler)
         if msg is not None:
             self.warning(msg)
 
@@ -872,9 +1011,6 @@ def main():
 # -------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
     data = range(100_000_000)
-
-    # with Timer() as tm:
-    #    res = is_sorted(data)
-    # print(f"Общее время выполнения is_sorted({res}):", tm.elapsed_time)
+    print(Timers.get_best_time(is_sorted, data, repeat=10))
 
     main()
