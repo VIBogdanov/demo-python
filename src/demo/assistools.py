@@ -435,10 +435,10 @@ class Timers:
                 self.__logger: TLogger = logger
             # Когда предано имя готового логгера
             case str():
-                self.__logger: TLogger = self.__get_loginfo(logger)
+                self.__logger: TLogger = self._get_loginfo(logger)
             # Иначе создаем свой собственный логгер
             case _:
-                self.__logger: TLogger = self.__get_loginfo(self.__class__.__name__)
+                self.__logger: TLogger = self._get_loginfo(self.__class__.__name__)
 
     # Реализация метода __call__ в виде декоратора позволяет использовать класс как декоратор: @Timer()
     # При этом можно задать функцию источник времени. Например: @Timer(time.process_time)
@@ -447,7 +447,7 @@ class Timers:
         @functools.wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
             result: Any = None
-            func_parameters: str = self.get_func_parameters(func, *args, **kwargs)
+            func_parameters: str = self._get_func_parameters(func, *args, **kwargs)
             # Для декоратора используем свои собственные временные метки start и elapsed.
             # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
             # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
@@ -503,7 +503,7 @@ class Timers:
             self.stop()
 
     @staticmethod
-    def get_func_parameters(func: Callable, *args: Any, **kwargs: Any) -> str:
+    def _get_func_parameters(func: Callable, *args: Any, **kwargs: Any) -> str:
         """Формирует строку со списком аргументов и их значений вызываемого объекта,
         который передается классу Timers() для замера времени выполнения.
 
@@ -531,7 +531,7 @@ class Timers:
         )
 
     @staticmethod
-    def __get_loginfo(logger_name: str) -> TLogger:
+    def _get_loginfo(logger_name: str) -> TLogger:
         """Создает логгер для класса Timers(), который осуществляет
         отформатированный вывод на консоль.
 
@@ -680,9 +680,10 @@ class Timers:
         """Время, вычисленное методом measure_average_time"""
         return self.__elapsed_time.average_elapsed_time
 
-    class get_times:
-        """Вычисляет время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
-        Может вызывается как метод класса Timers.get_best_time без создания экземпляра класса Timers.
+    class get_timers:
+        """Внутренний класс. Вычисляет время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
+        Мини версия класса Timers без ручного таймера, без декоратора и менеджера контента.
+        Используется методами класса Timers. Может быть вызван без создания экземпляра Timers.get_timers.
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения. Default: None
@@ -715,9 +716,9 @@ class Timers:
             type: TTimeType = "Total",
             **kwds: Any,
         ) -> None:
-            self.time_source = time_source
-            self.repeat = repeat
-            self.type = type
+            self.time_source: Callable = time_source
+            self.repeat: int = repeat
+            self.type: TTimeType = type
             self.__result: Any = None
             self.__time: float = float("inf")
             self.__func_signature: str = ""
@@ -725,7 +726,7 @@ class Timers:
                 self.__call__(func, *args, **kwds)
 
         def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
-            self.__func_signature = f"{func.__module__}.{func.__name__}({Timers.get_func_parameters(func, *args, **kwds)})"
+            self.__func_signature = f"{func.__module__}.{func.__name__}({Timers._get_func_parameters(func, *args, **kwds)})"
             match self.type:
                 case "Total":
                     self.__total_time(func, args, kwds)
@@ -809,8 +810,8 @@ class Timers:
         repeat: int = 1000,
         **kwargs: Any,
     ):
-        """Вычисляет общее время выполнения вызываемого объекта за N повторов.
-        Возвращает результат вызова get_times.result и измеренное время get_times.time.
+        """Метод класса. Вычисляет общее время выполнения вызываемого объекта за N повторов.
+        Возвращает результат вызова get_timers.result и измеренное время get_timers.time.
 
         Args:
             func (Callable | None, optional): Вызываемый объект. Defaults to None.
@@ -820,9 +821,9 @@ class Timers:
             repeat (int, optional): Количество повторов. Defaults to 1000.
 
         Returns:
-            get_times: Экземпляр класса get_times
+            get_times: Экземпляр класса get_timers
         """
-        return cls.get_times(
+        return cls.get_timers(
             func,
             *args,
             time_source=time_source,
@@ -840,8 +841,8 @@ class Timers:
         repeat: int = 1000,
         **kwargs: Any,
     ):
-        """Вычисляет лучшее время выполнения вызываемого объекта за N повторов.
-        Возвращает результат вызова get_times.result и измеренное время get_times.time.
+        """Метод класса. Вычисляет лучшее время выполнения вызываемого объекта за N повторов.
+        Возвращает результат вызова get_timers.result и измеренное время get_timers.time.
 
         Args:
             func (Callable | None, optional): Вызываемый объект. Defaults to None.
@@ -851,9 +852,9 @@ class Timers:
             repeat (int, optional): Количество повторов. Defaults to 1000.
 
         Returns:
-            get_times: Экземпляр класса get_times
+            get_times: Экземпляр класса get_timers
         """
-        return cls.get_times(
+        return cls.get_timers(
             func,
             *args,
             time_source=time_source,
@@ -871,8 +872,8 @@ class Timers:
         repeat: int = 1000,
         **kwargs: Any,
     ):
-        """Вычисляет среднее время выполнения вызываемого объекта за N повторов.
-        Возвращает результат вызова get_times.result и измеренное время get_times.time.
+        """Метод класса. Вычисляет среднее время выполнения вызываемого объекта за N повторов.
+        Возвращает результат вызова get_timers.result и измеренное время get_timers.time.
 
         Args:
             func (Callable | None, optional): Вызываемый объект. Defaults to None.
@@ -882,9 +883,9 @@ class Timers:
             repeat (int, optional): Количество повторов. Defaults to 1000.
 
         Returns:
-            get_times: Экземпляр класса get_times
+            get_times: Экземпляр класса get_timers
         """
-        return cls.get_times(
+        return cls.get_timers(
             func,
             *args,
             time_source=time_source,
@@ -907,7 +908,7 @@ class Timers:
         _repeat: int = kwargs.pop("repeat", self.repeat)
 
         try:
-            _time = self.get_times(
+            _time = self.get_timers(
                 func,
                 *args,
                 time_source=_time_source,
@@ -917,7 +918,7 @@ class Timers:
             )
         except Exception as exc:
             raise RuntimeError(
-                f"Call error {func.__module__}.{func.__name__}({self.get_func_parameters(func, *args, **kwargs)})"
+                f"Call error {func.__module__}.{func.__name__}({self._get_func_parameters(func, *args, **kwargs)})"
             ) from exc
         else:
             match type:
@@ -1065,9 +1066,9 @@ def rinda_multiplication(a: int, b: int) -> int:
     # Если оба <0 или >0, то sign = (-1)**False = (-1)**0 = 1
     sign: int = (-1) ** ((a < 0) ^ (b < 0))
 
-    # Внутренняя функция-генератор, которая выполняет попарное деление/умножение
-    # на 2, и фильтрует четные значения, полученные после деления на 2.
     def _get_addendum(a, b) -> Generator[int, None, None]:
+        """Внутренняя функция-генератор, которая выполняет попарное деление/умножение
+        на 2, и фильтрует четные значения, полученные после деления на 2."""
         # Работаем с абсолютными целочисленными значениями
         # Для уменьшения количества итераций, выбираем наименьший множитель
         if (b := abs_int(b)) < (a := abs_int(a)):
