@@ -447,7 +447,7 @@ class Timers:
         @functools.wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
             result: Any = None
-            func_parameters: str = self._get_func_parameters(func, *args, **kwargs)
+            func_signature: str = f"{func.__module__}.{func.__name__}({self._get_func_parameters(func, *args, **kwargs)})"
             # Для декоратора используем свои собственные временные метки start и elapsed.
             # Это позволяет использовать один и тот же таймер и как декоратор, и как менеджер контента.
             # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
@@ -455,9 +455,7 @@ class Timers:
                 start_time = self.time_source()
                 result = func(*args, **kwargs)
             except Exception as exc:
-                raise RuntimeError(
-                    f"Call error {func.__module__}.{func.__name__}({func_parameters})"
-                ) from exc
+                raise RuntimeError(f"Call error {func_signature}") from exc
             else:
                 # При измерении интервала времени для декоратора аккумулирование не используется.
                 # Для декоратора накопление не имеет смысла, т.к. измеряется конкретная функция
@@ -470,7 +468,7 @@ class Timers:
                 )
                 if self.is_show:
                     self.__logger.info(
-                        f"Call time [{func.__module__}.{func.__name__}({func_parameters}) -> {result}] = {self.time_call}"
+                        f"Call time [{func_signature} -> {result}] = {self.time_call}"
                     )
             return result
 
@@ -683,7 +681,8 @@ class Timers:
     class get_timers:
         """Внутренний класс. Вычисляет время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
         Мини версия класса Timers без ручного таймера, без декоратора и менеджера контента.
-        Используется методами класса Timers. Может быть вызван без создания экземпляра Timers.get_timers.
+        Используется методами класса Timers. Может быть вызван без создания экземпляра: Timers.get_timers.
+        Может использоваться отдельно от класса Timers для замеров времени выполнения вызываемых обЪектов.
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения. Default: None
@@ -691,7 +690,7 @@ class Timers:
             **kwds (Any): Список именованных аргументов для вызываемого объекта
             time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
             repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
-            type (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Default: Total
+            type (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Default: 'Total'
 
         Raises:
             RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
@@ -726,7 +725,29 @@ class Timers:
                 self.__call__(func, *args, **kwds)
 
         def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
-            self.__func_signature = f"{func.__module__}.{func.__name__}({Timers._get_func_parameters(func, *args, **kwds)})"
+            # Извлекаем из составной ссылки на текущий класс имя объемлющего класса
+            # и получаем по имени ссылку на объект объемлющего класса (в нашем случае Timers)
+            # _cls = eval(self.__class__.__qualname__.split(sep=".")[0]) - альтернатива
+            _cls = getattr(
+                sys.modules[__name__],
+                self.__class__.__qualname__.split(sep=".")[0],
+                None,
+            )
+            # None - если вообще не удалось получить класс по его имени
+            # try - на случай, если класс получен, но не тот что нужно
+            try:
+                _func_args: str = (
+                    ""
+                    if _cls is None
+                    else _cls._get_func_parameters(func, *args, **kwds)
+                )
+            except Exception:
+                self.__func_signature = f"{func.__module__}.{func.__name__}()"
+            else:
+                self.__func_signature = (
+                    f"{func.__module__}.{func.__name__}({_func_args})"
+                )
+
             match self.type:
                 case "Total":
                     self.__total_time(func, args, kwds)
@@ -901,8 +922,9 @@ class Timers:
         kwargs: dict[str, Any],
         type: TTimeType,
     ) -> Any:
-        """Вспомогательный класс для методов measure_total_time, measure_best_time, measure_average_time"""
-        # Извлекаем из входных аргументов настроечные параметры для time_source, is_show и repeat
+        """Вспомогательная функция для методов measure_total_time, measure_best_time, measure_average_time"""
+        # Извлекаем из входных аргументов настроечные параметры для time_source, is_show и repeat,
+        # если они были переданы, иначе используем настройки текущего экземпляра класса Timers
         _time_source: Callable = kwargs.pop("time_source", self.time_source)
         _is_show: Callable = kwargs.pop("is_show", self.is_show)
         _repeat: int = kwargs.pop("repeat", self.repeat)
@@ -921,6 +943,7 @@ class Timers:
                 f"Call error {func.__module__}.{func.__name__}({self._get_func_parameters(func, *args, **kwargs)})"
             ) from exc
         else:
+            # Сохраняем полученное время в текущем экземпляре класса Timers
             match type:
                 case "Total":
                     self.__elapsed_time.total_elapsed_time = _time.time
@@ -936,7 +959,9 @@ class Timers:
 
     def measure_total_time(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет общее время выполнения заданной функции с аргументами за N повторов.
-        Измеренное время доступно через свойство time_total.
+        Измеренное время доступно через свойство time_total. Неявно можно передать
+        настроечные параметры time_source, repeat и is_show в виде именованных аргументов,
+        иначе будут использованы значения соответствующих свойств экземпляра класса.
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
@@ -957,7 +982,9 @@ class Timers:
 
     def measure_best_time(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет лучшее время выполнения заданной функции с аргументами за N повторов.
-        Измеренное время доступно через свойство time_best.
+        Измеренное время доступно через свойство time_best. Неявно можно передать
+        настроечные параметры time_source, repeat и is_show в виде именованных аргументов,
+        иначе будут использованы значения соответствующих свойств экземпляра класса.
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
@@ -978,7 +1005,9 @@ class Timers:
 
     def measure_average_time(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Вычисляет среднее время выполнения заданной функции с аргументами за N повторов.
-        Измеренное время доступно через свойство time_average.
+        Измеренное время доступно через свойство time_average. Неявно можно передать
+        настроечные параметры time_source, repeat и is_show в виде именованных аргументов,
+        иначе будут использованы значения соответствующих свойств экземпляра класса.
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
