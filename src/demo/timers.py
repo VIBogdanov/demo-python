@@ -48,11 +48,13 @@ class _TimeStorage:
     def time(self, timer: TTimerType) -> float:
         return self.timers_time.get(timer, 0.0)
 
-    def log(self, timer: TTimerType) -> str:
-        _str: str = self.timers_log.get(timer, f"{timer} time not calculated!")
+    def log(self, timer: TTimerType | None = None) -> str:
+        if timer is None:
+            timer = self._last_timer
+        _str: str = self.timers_log.get(timer, f"{timer} time not measured!")
         # Если строка с текстом лога пуста, возвращаем просто время
         if len(_str) == 0:
-            _str = str(self.time(timer))
+            _str = f"{timer} time = {self.time(timer)}"
         return _str
 
 
@@ -69,18 +71,6 @@ class Timers:
         repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
         logger (Logger | str | None): Вывод результатов замеров. По-умолчанию на консоль. Default: None
     """
-
-    __slots__ = (
-        "__time_source",
-        "__is_accumulate",
-        "__is_show",
-        "__repeat",
-        "__timers",
-        "__start_time",
-        "__logger",
-        "__dict__",
-        "__weakref__",
-    )
 
     def __init__(
         self,
@@ -191,21 +181,43 @@ class Timers:
         return result
 
     def __repr__(self) -> str:
+        # На случай, когда не удалось получить значение параметра
+        _not_defined = object()
+        # Собираем из списка параметров метода __init__ строку инициализации экземпляра класса
+        # с текущими значениями параметров, а не с переданными в момент инициализации (благодаря генератору)
+        # Генератор формируем каждый раз заново, т.к. генератор одноразовый, а метод __repr__
+        # может быть вызван многократно
+        get_init_parameters: Generator[tuple[str, Any, str, Any], None, None] = (
+            (
+                attr,
+                value := getattr(self, attr, False)
+                or getattr(self, "_" + attr, False)
+                or getattr(
+                    self, "_" + self.__class__.__name__ + "__" + attr, _not_defined
+                ),
+                getattr(value, "__module__", ""),
+                getattr(value, "__name__", value),
+            )
+            for attr in inspect.signature(self.__init__).parameters.keys()
+        )
         return "".join(
             (
-                f"{self.__class__.__name__}",
-                f"(time_source={self.time_source.__module__}.{self.time_source.__name__}",
-                f", is_accumulate={self.is_accumulate!r}",
-                f", is_show={self.is_show!r}",
-                f", repeat={self.repeat!r}",
-                f", logger={self.__logger!r}",
+                f"{self.__class__.__name__}(",
+                ", ".join(
+                    # Если выводимый объект импортирован, добавляем имя модуля
+                    # Если у объекта есть поле __name__, выводим его содержимое
+                    # Иначе выводим объект как есть
+                    f"{attr} = {f'{module}.{name}' if module else value}"
+                    for attr, value, module, name in get_init_parameters
+                    if value is not _not_defined  # Отбираем не пустые параметры
+                ),
                 ")",
             )
         )
 
     def __str__(self) -> str:
-        # Выводим __str__ класса _TimeStorage - лог последнего сохраненного таймера
-        return str(self.__timers)
+        # По-умолчанию выводим лог последнего сохраненного таймера
+        return self.__timers.log()
 
     def log(self, timer: TTimerType) -> str:
         # Выводим лог конкретного таймера, если он был ранее сохранен
@@ -456,16 +468,10 @@ class MiniTimers:
     Raises:
         RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
         указанием имени вызываемого объекта и его аргументов.
-    """
 
-    __slots__ = (
-        "time_source",
-        "repeat",
-        "timer",
-        "__result",
-        "__time",
-        "__func_signature",
-    )
+    Returns:
+            Any: Результат, возвращаемый вызываемым объектом.
+    """
 
     def __init__(
         self,
@@ -501,6 +507,8 @@ class MiniTimers:
             case "Average":
                 self.__total_time(func, args, kwds)
                 self.__time = self.__time / self.repeat
+            case _:
+                return None
 
         return self.result
 
@@ -566,3 +574,7 @@ class MiniTimers:
     @property
     def log(self) -> str:
         return self.__str__()
+
+
+if __name__ == "__main__":
+    pass

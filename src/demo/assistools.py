@@ -8,7 +8,7 @@ from collections import Counter, OrderedDict, deque
 from collections.abc import Generator, Iterable, Iterator, Sequence, Sized
 from typing import Any
 
-import demo
+from demo.timers import MiniTimers
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 
@@ -462,6 +462,6 @@ def main():
 # -------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
     data = range(100_000_000)
-    print(demo.MiniTimers(is_sorted, data, repeat=10))
+    print(MiniTimers(is_sorted, data, timer="Best", repeat=10))
 
     main()

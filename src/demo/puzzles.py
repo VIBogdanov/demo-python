@@ -1,10 +1,10 @@
-from array import array
+import array
+import functools
+import math
 from collections import Counter, defaultdict, deque
 from collections.abc import Generator, Iterable, Iterator
 from enum import Enum
-from functools import reduce
 from itertools import chain, groupby, permutations
-from math import prod
 from typing import Literal, TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
@@ -112,7 +112,7 @@ def mult_matrix(
     return [
         # если ни один элемент из строки не удовлетворяет ограничениям, возвращаем значение по-умолчанию
         # иначе перемножаем отфильтрованные значения
-        round(prod(mult_val), 3) if mult_val else default_val
+        round(math.prod(mult_val), 3) if mult_val else default_val
         for mult_val in (
             (a_col for a_col in a_str if min_val <= a_col <= max_val)
             for a_str in matrix
@@ -256,7 +256,7 @@ def get_combination_numbers(digits: Iterable[int]) -> list[tuple[int, ...]]:
     # Перебираем все полученные двухзначные, трехзначные и т.д. наборы цифр
     for selected_digits in gen_digits_list:
         # Из отобранных цифр (в нашем примере 1 и 2) формируем число 12
-        num: int = reduce(
+        num: int = functools.reduce(
             lambda dig_prev, dig_next: 10 * dig_prev + dig_next, selected_digits
         )
         # Удаляем из списка цифры, из которых состоят двухзначных, трехзначных и т.д. числа.
@@ -474,7 +474,7 @@ def get_word_palindrome(chars: Iterable[str], *, with_separator: bool = True) ->
     """
     result: str = ""
     # Массив для аккумулирования кандидатов символов-разделителей между половинами палиндрома
-    separator_candidate = array("u")
+    separator_candidate = array.array("u")
 
     # Внутренняя функция генератор для формирования символов, входящих в палиндром
     # В параметре передаем итератор на строку, т.к. не собираемся менять строку и копия не нужна

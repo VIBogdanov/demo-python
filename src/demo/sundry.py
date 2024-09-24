@@ -1,8 +1,8 @@
+import functools
+import itertools
 from collections import defaultdict, deque
 from collections.abc import Iterable, Iterator, Sequence
 from enum import Enum
-from functools import reduce
-from itertools import accumulate
 from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar
 
 import demo
@@ -47,7 +47,7 @@ def find_intervals(
 
         # Суммируем элементы списка по нарастающей и сохраняем в словаре
         # список индексов для каждой суммы. В качестве ключа - сама сумма.
-        for id_to, sum_accum in enumerate(accumulate(elements)):
+        for id_to, sum_accum in enumerate(itertools.accumulate(elements)):
             # Если на очередной итерации полученная сумма равна искомому значению,
             # заносим диапазон от 0 до текущей позиции в результирующий список.
             if sum_accum == _target:
@@ -170,7 +170,7 @@ def _do_find_nearest(
                 # сортируем правую часть числа (по возрастанию или по убыванию) с учетом направления поиска
                 _digits_list[k::] = sorted(iter(_digits_list[k::]), reverse=previous)
                 # собираем из массива цифр результирующее число
-                return reduce(
+                return functools.reduce(
                     lambda dig_prev, dig_next: 10 * dig_prev + dig_next, _digits_list
                 )
     return None
