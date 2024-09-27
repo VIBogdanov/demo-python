@@ -23,19 +23,19 @@ def type_checking(*type_args, **type_kwargs):
     Examples:
         >>>
         @type_checking(int, (int, str), z=float)
-        def samefunction(x, y, z=4.5):
+        def somefunction(x, y, z=4.5):
             pass
         # Альтернативный вариант
         @type_checking(y = (int, str), x = int)
-        def samefunction(x, y, z=4.5):
+        def somefunction(x, y, z=4.5):
             pass
         # Результат работы декоратора
-        samefunction(1, 3, z=123.5)   #OK
-        samefunction(1, '3', z=123.5)   #OK
-        samefunction(1, 3)   #OK
-        samefunction('1', 3, z=123.5)   #Error
-        samefunction(1, 3, z=123)   #Error for first variant
-        samefunction(1, 3.4)   #Error
+        somefunction(1, 3, z=123.5)   #OK
+        somefunction(1, '3', z=123.5)   #OK
+        somefunction(1, 3)   #OK
+        somefunction('1', 3, z=123.5)   #Error
+        somefunction(1, 3, z=123)   #Error for first variant
+        somefunction(1, 3.4)   #Error
     """
 
     def decorate(func):

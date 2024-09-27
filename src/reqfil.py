@@ -259,10 +259,7 @@ def main():
         # то возможно создание DataFrame без промежуточного словаря прямо из генератора
         dfr = DataFrame(requests_generator)
         if IS_SHOWDATAFRAME:
-            if len(dfr) > 0:
-                print(dfr[["request", "quantity", "words"]])
-            else:
-                print(dfr.info())
+            print(dfr[["request", "quantity", "words"]] if len(dfr) else dfr.info())
 
         # Если выборка запросов не пуста
         if len(dfr) > 0:
