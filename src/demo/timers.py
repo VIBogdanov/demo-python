@@ -74,7 +74,9 @@ class _TimeStorage:
         self._timers_log[timer] = log
         self._last_timer = timer
 
-    def time(self, timer: TTimerType) -> float:
+    def time(self, timer: TTimerType | None = None) -> float:
+        if timer is None:
+            timer = self._last_timer
         return self._timers_time.get(timer, 0.0)
 
     def log(self, timer: TTimerType | None = None) -> str:
@@ -262,8 +264,8 @@ class Timers:
         # По-умолчанию выводим лог последнего сохраненного таймера
         return self.__timers.log()
 
-    def log(self, timer: TTimerType) -> str:
-        # Выводим лог конкретного таймера, если он был ранее сохранен
+    def log(self, timer: TTimerType | None = None) -> str:
+        # Выводим лог заданного таймера или последнего сохраненного
         return self.__timers.log(timer)
 
     # Для поддержки протокола менеджера контекста, реализованы методы __enter__ и __exit__
@@ -360,7 +362,7 @@ class Timers:
         if logger.getEffectiveLevel() > logging.INFO:
             logger.setLevel(logging.INFO)
 
-        handler_name: str = "_TimersHandler" + "__" + str(id(logger))
+        handler_name: str = "_TimersHandler__" + str(id(logger))
         # Предотвращаем дублирование handler-ра
         if handler_name not in set(
             handler.name for handler in logger.handlers if handler.name is not None
@@ -409,12 +411,13 @@ class Timers:
 
         return self.time_timer
 
-    def reset(self) -> None:
-        """Обнуляет все счетчики времени и останавливает таймер,
-        если он был запущен в момент вызова reset.
+    def reset(self, timer: TTimerType | None = None) -> None:
+        """Обнуляет заданный счетчик времени, либо все счетчики при timer=None.
+        Для счетчика 'Timer' дополнительно останавливает таймер.
         """
-        self.__timers.reset()
-        self.__start_time = None
+        self.__timers.reset(timer)
+        if timer == "Timer":
+            self.__start_time = None
 
     def restart(self) -> None:
         """Сбрасывает счетчик ручного таймера start/stop и
@@ -485,7 +488,8 @@ class Timers:
     @logger.setter
     def logger(self, logger: logging.Logger | str) -> None:
         match logger:
-            # Меняем текущий логгер на новый
+            # Меняем текущий логгер на новый или на самого себя с
+            # измененными настройками
             case logging.Logger():
                 self.__logger: logging.Logger = logger
             # Создаем новый логгер с заданным именем или перенастраиваем
@@ -502,32 +506,36 @@ class Timers:
         """Признак работающего таймера"""
         return self.__start_time is not None
 
+    def time(self, timer: TTimerType | None = None) -> float:
+        # Выводим время заданного таймера или по-умолчанию последнего сохраненного
+        if timer == "Timer" and self.is_running:
+            raise TimerNotStopError
+        return self.__timers.time(timer)
+
     @property
     def time_timer(self) -> float:
         """Время между start() и stop()"""
-        if self.is_running:
-            raise TimerNotStopError
-        return self.__timers.time("Timer")
+        return self.time("Timer")
 
     @property
     def time_call(self) -> float:
         """Время, измеренное декоратором"""
-        return self.__timers.time("Call")
+        return self.time("Call")
 
     @property
     def time_total(self) -> float:
         """Суммарное время выполнения вызываемого объекта за N повторов"""
-        return self.__timers.time("Total")
+        return self.time("Total")
 
     @property
     def time_best(self) -> float:
         """Лучшее время выполнения вызываемого объекта за N повторов"""
-        return self.__timers.time("Best")
+        return self.time("Best")
 
     @property
     def time_average(self) -> float:
         """Среднее время выполнения вызываемого объекта за N повторов"""
-        return self.__timers.time("Average")
+        return self.time("Average")
 
 
 class MiniTimers:
