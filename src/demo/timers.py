@@ -6,6 +6,7 @@ import logging
 import sys
 import time
 from collections.abc import Callable
+from itertools import repeat
 from typing import Any, Generator, Literal, Self, TypeAlias
 
 TRepeat: TypeAlias = int | str | float
@@ -41,7 +42,7 @@ class TimerTypeError(TimersErrors):
 
 
 @dataclasses.dataclass(slots=True)
-class _TimeStorage:
+class _TimersTime:
     """Private class for keeping elapsed time of Timers class."""
 
     # Последний сохраненный таймер
@@ -112,31 +113,16 @@ class Timers:
         # Позволяет перенаправить вывод тайминга. По-умолчанию вывод на консоль.
         logger: TLogger = None,
     ) -> None:
-        self.__time_source: Callable = (
-            time_source if isinstance(time_source, Callable) else time.perf_counter
-        )
-        self.__is_accumulate: bool = bool(is_accumulate)
-        self.__is_show: bool = bool(is_show)
-        try:
-            self.__repeat: int = int(repeat)
-        except Exception:
-            self.__repeat = 1000
+        self.time_source = time_source
+        self.is_accumulate = is_accumulate
+        self.is_show = is_show
+        self.repeat = repeat
+        # Если logger не задан, создаем дефолтовый для класса Timers
+        self.logger = logger if logger is not None else self.__class__.__name__
         # Класс-хранилище всех измеряемых показателей времени
-        self.__timers: _TimeStorage = _TimeStorage()
+        self.__timers: _TimersTime = _TimersTime()
         # None - счетчик не запущен
         self.__start_time: float | None = None
-
-        match logger:
-            # Когда передан готовый объект Logger
-            case logging.Logger():
-                self.__logger: logging.Logger = logger
-            # Когда предано имя логгера, который либо уже существует,
-            # либо требуется создать новый логгер с заданным именем
-            case str():
-                self.__logger = self._get_loginfo(logger)
-            # Иначе создаем свой собственный логгер
-            case _:
-                self.__logger = self._get_loginfo(self.__class__.__name__)
 
     def __call__(
         self,
@@ -152,17 +138,17 @@ class Timers:
         Неявные настроечные параметры действуют единоразово только на момент вызова метода и
         не меняют параметры, заданные при инициализации экземпляра класса Timers.
         В режимах "Timer" и "Call" параметр repeat не используется.
-        В режимах"Total", "Best" и "Average" параметр is_accumulate игнорируется.
+        В режимах "Total", "Best" и "Average" параметр is_accumulate игнорируется.
 
-        Например:
-            instance(func, *args, **kwds, repeat=100, is_accumulate=True)
+        Examples:
+            instance(func, *args, **kwds, timer='Best', repeat=100)
             instance(func, *args, **kwds, time_source=time.process_time, is_show=False)
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
             *args (Any): Список позиционных аргументов для вызываемого объекта
             **kwds (Any): Список именованных аргументов для вызываемого объекта
-            timer (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Default: 'Total'
+            timer (str): Какое время нужно измерит. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Total'
             time_source (Callable): Функция, используемая для измерения времени. Default: self.time_source
             repeat (int): Количество повторных запусков вызываемого объекта. Default: self.repeat
             is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: self.is_accumulate
@@ -196,13 +182,14 @@ class Timers:
                         _time += self.__timers.time(timer)
                 case "Total" | "Average":
                     _time = _time_source()
-                    for _ in range(_repeat):
+                    # itertools.repeat быстрее range
+                    for _ in repeat(None, _repeat):
                         result = func(*args, **kwds)
                     _time = _time_source() - _time
                     if timer == "Average":
                         _time = _time / _repeat
                 case "Best":
-                    for _ in range(_repeat):
+                    for _ in repeat(None, _repeat):
                         _elapsed_time: float = _time_source()
                         result = func(*args, **kwds)
                         _elapsed_time = _time_source() - _elapsed_time
@@ -216,7 +203,7 @@ class Timers:
             _log: str = f"{timer} time [{func_signature} -> {result}] = {_time}"
             self.__timers.save(timer, _time, _log)
             if _is_show:
-                self.__logger.info(_log)
+                self.logger.info(_log)
 
         return result
 
@@ -281,35 +268,21 @@ class Timers:
     def wrapper(self, func: Callable):
         """Позволяет использовать класс как декоратор: @Timers().wrapper. При этом можно задать
         функцию источник времени и другие параметры для класса Timers.
+        Допускается использовать один и тот же таймер и как декоратор, и как менеджер контекста и как ручной таймер.
+        При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
 
-        Например: @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).wrapper.
+        Например:
+
+        @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).wrapper.
         Альтернатива, предварительно создать экземпляр класса Timers, настроить необходимые параметры и
         использовать экземпляр как декоратор: @instance.wrapper.
+
         Параметр repeat для декоратора не используется и игнорируется.
         """
 
         @functools.wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
-            result: Any = None
-            func_signature: str = f"{func.__module__}.{func.__name__}({self._get_func_parameters(func, *args, **kwargs)})"
-            # Допускается использовать один и тот же таймер и как декоратор, и как менеджер контекста и как ручной таймер.
-            # При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
-            try:
-                _time: float = self.time_source()
-                result = func(*args, **kwargs)
-            except Exception as exc:
-                raise TimerCallError(f"Call error {func_signature}") from exc
-            else:
-                _time = self.time_source() - _time
-                if self.is_accumulate:
-                    _time += self.__timers.time("Call")
-                _log: str = f"Call time [{func_signature} -> {result}] = {_time}"
-                self.__timers.save("Call", _time, _log)
-
-                if self.is_show:
-                    self.__logger.info(_log)
-
-            return result
+            return self(func, *args, **kwargs, timer="Call")
 
         return _wrapper
 
@@ -347,7 +320,7 @@ class Timers:
         return _str
 
     @staticmethod
-    def _get_loginfo(logger_name: str) -> logging.Logger:
+    def _get_logger(logger_name: str) -> logging.Logger:
         """Создает логгер для класса Timers(), который осуществляет
         отформатированный вывод на консоль.
 
@@ -361,8 +334,8 @@ class Timers:
         # Если текущего уровня надостаточно для сообщений типа INFO
         if logger.getEffectiveLevel() > logging.INFO:
             logger.setLevel(logging.INFO)
-
-        handler_name: str = "_TimersHandler__" + str(id(logger))
+        # Формируем уникальное имя handler-ра для конкретного логгера
+        handler_name: str = f"_{logger_name}__{id(logger)}"
         # Предотвращаем дублирование handler-ра
         if handler_name not in set(
             handler.name for handler in logger.handlers if handler.name is not None
@@ -383,6 +356,7 @@ class Timers:
 
     def start(self) -> None:
         """Запускает таймер."""
+        # Если таймер уже был запущен
         if self.__start_time is not None:
             raise TimerStartError
         self.__start_time = self.time_source()
@@ -395,6 +369,7 @@ class Timers:
         Returns:
             float: Время работы таймера.
         """
+        # Если таймер еще не был запущен
         if self.__start_time is None:
             raise TimerStopError
 
@@ -407,7 +382,7 @@ class Timers:
         self.__timers.save("Timer", _time, _log)
 
         if self.is_show:
-            self.__logger.info(_log)
+            self.logger.info(_log)
 
         return self.time_timer
 
@@ -446,11 +421,9 @@ class Timers:
     @is_accumulate.setter
     def is_accumulate(self, value: bool) -> None:
         try:
-            self.__is_accumulate = type(self.is_accumulate)(value)
+            self.__is_accumulate = bool(value)
         except (TypeError, ValueError) as exc:
-            raise TimerTypeError(
-                f"Value 'is_accumulate' must be {self.is_accumulate.__class__.__name__}."
-            ) from exc
+            raise TimerTypeError("Value 'is_accumulate' must be bool.") from exc
 
     @property
     def is_show(self) -> bool:
@@ -460,11 +433,10 @@ class Timers:
     @is_show.setter
     def is_show(self, value: bool) -> None:
         try:
-            self.__is_show = type(self.is_show)(value)
+            self.__is_show = bool(value)
         except (TypeError, ValueError) as exc:
-            raise TimerTypeError(
-                f"Value 'is_show' must be {self.is_show.__class__.__name__}."
-            ) from exc
+            raise TimerTypeError("Value 'is_show' must be bool.") from exc
+        # print(f"is_show type: {self.is_show}")
 
     @property
     def repeat(self) -> int:
@@ -474,11 +446,9 @@ class Timers:
     @repeat.setter
     def repeat(self, value: TRepeat) -> None:
         try:
-            self.__repeat = type(self.repeat)(value)
+            self.__repeat = int(value)
         except (TypeError, ValueError) as exc:
-            raise TimerTypeError(
-                f"Value 'repeat' must be {self.repeat.__class__.__name__}."
-            ) from exc
+            raise TimerTypeError("Value 'repeat' must be int.") from exc
 
     @property
     def logger(self) -> logging.Logger:
@@ -491,13 +461,11 @@ class Timers:
             # Меняем текущий логгер на новый или на самого себя с
             # измененными настройками
             case logging.Logger():
-                self.__logger: logging.Logger = logger
+                self.__logger = logger
             # Создаем новый логгер с заданным именем или перенастраиваем
             # существующий, добавляя отформатированный вывод на консоль.
             case str():
-                # Нет смысла перенастраивать самого себя,
-                if self.__logger.name != logger:
-                    self.__logger = self._get_loginfo(logger)
+                self.__logger = self._get_logger(logger)
             case _:
                 raise TimerTypeError("Value 'logger' must be logging.Logger or str.")
 
@@ -507,7 +475,7 @@ class Timers:
         return self.__start_time is not None
 
     def time(self, timer: TTimerType | None = None) -> float:
-        # Выводим время заданного таймера или по-умолчанию последнего сохраненного
+        # Возвращает время заданного таймера или по-умолчанию последнего сохраненного
         if timer == "Timer" and self.is_running:
             raise TimerNotStopError
         return self.__timers.time(timer)
@@ -575,7 +543,7 @@ class MiniTimers:
         self.__time: float = float("inf")
         self.__func_signature: str = ""
         if func is not None and isinstance(func, Callable):
-            self.__call__(func, *args, **kwds)
+            self(func, *args, **kwds)
 
     def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
         self.__func_signature = f"{func.__module__}.{func.__name__}({Timers._get_func_parameters(func, *args, **kwds)})"
@@ -588,13 +556,12 @@ class MiniTimers:
                     self.__total_time(func, args, kwds)
                 finally:
                     self.repeat = _repeat
-            case "Total":
+            case "Total" | "Average":
                 self.__total_time(func, args, kwds)
+                if self.timer == "Average":
+                    self.__time = self.__time / self.repeat
             case "Best":
                 self.__best_time(func, args, kwds)
-            case "Average":
-                self.__total_time(func, args, kwds)
-                self.__time = self.__time / self.repeat
             case _:
                 return None
 
@@ -613,17 +580,13 @@ class MiniTimers:
         )
 
     def __str__(self) -> str:
-        return (
-            f"{self.timer} time [{self.__func_signature} -> {self.result}] = {self.time}"
-            if len(self.__func_signature) and self.time != float("inf")
-            else f"{self.timer} time not measured!"
-        )
+        return self.log
 
     def __total_time(self, func: Callable, args: Any, kwds: Any) -> None:
         result: Any = None
         try:
             start_time: float = self.time_source()
-            for _ in range(self.repeat):
+            for _ in repeat(None, self.repeat):
                 result = func(*args, **kwds)
         except Exception as exc:
             raise RuntimeError(f"Call error {self.__func_signature}") from exc
@@ -637,12 +600,12 @@ class MiniTimers:
         result: Any = None
         best_time: float = float("inf")
         try:
-            for _ in range(self.repeat):
-                elapsed_time: float = self.time_source()
+            for _ in repeat(None, self.repeat):
+                _time: float = self.time_source()
                 result = func(*args, **kwds)
-                elapsed_time = self.time_source() - elapsed_time
-                if elapsed_time < best_time:
-                    best_time = elapsed_time
+                _time = self.time_source() - _time
+                if _time < best_time:
+                    best_time = _time
         except Exception as exc:
             raise RuntimeError(f"Call error {self.__func_signature}") from exc
         else:
@@ -661,8 +624,23 @@ class MiniTimers:
 
     @property
     def log(self) -> str:
-        return self.__str__()
+        return (
+            f"{self.timer} time [{self.__func_signature} -> {self.result}] = {self.time}"
+            if len(self.__func_signature) and self.time != float("inf")
+            else f"{self.timer} time not measured!"
+        )
 
 
 if __name__ == "__main__":
+    tmr = Timers()
+
+    @tmr.wrapper
+    def countdown(n, t=0):
+        while n > 0:
+            n -= 1
+
+    def listcomp(N):
+        [х * 2 for х in range(N)]
+
+    print(MiniTimers(listcomp, 1000000, repeat=1, timer="Best"))
     pass
