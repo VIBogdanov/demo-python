@@ -169,7 +169,8 @@ class Timers:
         _repeat: int = kwds.pop("repeat", self.repeat)
 
         result: Any = None
-        func_signature: str = f"{func.__module__}.{func.__name__}({self._get_func_parameters(func, *args, **kwds)})"
+        # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
+        func_signature: str = f"{getattr(func, '__module__', '')}.{getattr(func, '__name__', func)}({self._get_func_parameters(func, *args, **kwds)})"
         _time: float = float("inf")
 
         try:
@@ -387,11 +388,11 @@ class Timers:
         return self.time_timer
 
     def reset(self, timer: TTimerType | None = None) -> None:
-        """Обнуляет заданный счетчик времени, либо все счетчики при timer=None.
+        """Обнуляет заданный счетчик времени, либо все счетчики если timer=None.
         Для счетчика 'Timer' дополнительно останавливает таймер.
         """
         self.__timers.reset(timer)
-        if timer == "Timer":
+        if timer == "Timer" or timer is None:
             self.__start_time = None
 
     def restart(self) -> None:
@@ -475,7 +476,7 @@ class Timers:
         return self.__start_time is not None
 
     def time(self, timer: TTimerType | None = None) -> float:
-        # Возвращает время заданного таймера или по-умолчанию последнего сохраненного
+        """Возвращает время заданного таймера или по-умолчанию последнего сохраненного"""
         if timer == "Timer" and self.is_running:
             raise TimerNotStopError
         return self.__timers.time(timer)
@@ -546,7 +547,8 @@ class MiniTimers:
             self(func, *args, **kwds)
 
     def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
-        self.__func_signature = f"{func.__module__}.{func.__name__}({Timers._get_func_parameters(func, *args, **kwds)})"
+        # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
+        self.__func_signature = f"{getattr(func, '__module__', '')}.{getattr(func, '__name__', func)}({Timers._get_func_parameters(func, *args, **kwds)})"
 
         match self.timer:
             case "Timer" | "Call":
@@ -632,15 +634,4 @@ class MiniTimers:
 
 
 if __name__ == "__main__":
-    tmr = Timers()
-
-    @tmr.wrapper
-    def countdown(n, t=0):
-        while n > 0:
-            n -= 1
-
-    def listcomp(N):
-        [х * 2 for х in range(N)]
-
-    print(MiniTimers(listcomp, 1000000, repeat=1, timer="Best"))
     pass

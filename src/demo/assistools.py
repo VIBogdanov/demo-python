@@ -57,10 +57,20 @@ def type_checking(*type_args, **type_kwargs):
                 # Если для данного аргумента задана проверка типа
                 if arg_name in args_types:
                     # Если тип значения аргумента не соответствует заданному в декораторе
-                    if not isinstance(arg_value, args_types[arg_name]):
-                        raise TypeError(
-                            f"Argument '{arg_name}' must be {args_types[arg_name]}"
+                    if not isinstance(arg_value, arg_types := args_types[arg_name]):
+                        # Для join нужен кортеж
+                        arg_types = (
+                            arg_types
+                            if isinstance(arg_types, Iterable)
+                            else (arg_types,)
                         )
+                        # Собираем строку вида 'typename or typename ...'
+                        arg_type = " or ".join(
+                            # Если '__name__' отсутствует, класс типа возвращает сам себя
+                            str(getattr(arg_type, "__name__", arg_type))
+                            for arg_type in arg_types
+                        )
+                        raise TypeError(f"Argument '{arg_name}' must be {arg_type}")
             # Проверка типов пройдена успешно. Вызываем оригинальную функцию
             return func(*args, **kwargs)
 
