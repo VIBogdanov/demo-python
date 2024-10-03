@@ -162,59 +162,64 @@ class Timers:
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
         """
-        # Формируем список параметров с их значениями по-умолчанию,
-        # которые передаются в метод __init__ при создании экземпляра класса.
-        # Если значение по-умолчанию не задано, подставляется пустой object.
-        init_args = (
-            (arg, value.default if value.default is not value.empty else object())
-            for arg, value in inspect.signature(self.__init__).parameters.items()
-        )
+        # Формируем список параметров, которые передаются в метод __init__.
         # Для каждого из полученных параметров выполняем три шага:
         # - пытаемся получить значение из входных параметров метода __call__ из kwds
         # - иначе пытаемся получить значение из атрибута экземпляра класса Timers
         # - иначе подставляем значение по-умолчанию, заданное в методе __init__
+        # Если значение по-умолчанию не задано, подставляется пустой object
         # В итоге будет сформирован словарь из имен параметров и их значений
-        _vars = dict(
+        _attrs: dict[str, Any] = dict(
             (
                 arg,
                 kwds.pop(
                     arg,
                     getattr(self, arg, False)
                     or getattr(self, "_" + arg, False)
-                    or getattr(self, f"_{self.__class__.__name__}__{arg}", default),
+                    or getattr(
+                        self,
+                        f"_{self.__class__.__name__}__{arg}",
+                        val.default if val.default is not val.empty else object(),
+                    ),
                 ),
             )
-            for arg, default in init_args
+            for arg, val in inspect.signature(self.__init__).parameters.items()
         )
         # Из полученного словаря формируем именованный кортеж для удобства
-        vars = collections.namedtuple("Vars", _vars.keys())(**_vars)
+        _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
         result: Any = None
         # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
-        func_signature: str = f"{getattr(func, '__module__', '')}.{getattr(func, '__name__', func)}({self._get_func_parameters(func, *args, **kwds)})"
+        func_module = (
+            func_module + "."
+            if (func_module := getattr(func, "__module__", ""))
+            and func_module != "__main__"
+            else ""
+        )
+        func_signature: str = f"{func_module}{getattr(func, '__name__', func)}({self._get_func_parameters(func, *args, **kwds)})"
         _time: float = float("inf")
 
         try:
             match timer:
                 case "Timer" | "Call":
-                    _time = vars.time_source()
+                    _time = _self.time_source()
                     result = func(*args, **kwds)
-                    _time = vars.time_source() - _time
-                    if vars.is_accumulate:
+                    _time = _self.time_source() - _time
+                    if _self.is_accumulate:
                         _time += self.__timers.time(timer)
                 case "Total" | "Average":
-                    _time = vars.time_source()
+                    _time = _self.time_source()
                     # itertools.repeat быстрее range
-                    for _ in repeat(None, vars.repeat):
+                    for _ in repeat(None, _self.repeat):
                         result = func(*args, **kwds)
-                    _time = vars.time_source() - _time
+                    _time = _self.time_source() - _time
                     if timer == "Average":
-                        _time = _time / vars.repeat
+                        _time = _time / _self.repeat
                 case "Best":
-                    for _ in repeat(None, vars.repeat):
-                        _elapsed_time: float = vars.time_source()
+                    for _ in repeat(None, _self.repeat):
+                        _elapsed_time: float = _self.time_source()
                         result = func(*args, **kwds)
-                        _elapsed_time = vars.time_source() - _elapsed_time
+                        _elapsed_time = _self.time_source() - _elapsed_time
                         if _elapsed_time < _time:
                             _time = _elapsed_time
                 case _:
@@ -224,8 +229,8 @@ class Timers:
         else:
             _log: str = f"{timer} time [{func_signature} -> {result}] = {_time}"
             self.__timers.save(timer, _time, _log)
-            if vars.is_show:
-                vars.logger.info(_log)
+            if _self.is_show:
+                _self.logger.info(_log)
 
         return result
 
@@ -245,13 +250,15 @@ class Timers:
                 value := getattr(self, attr, False)  # Атрибут: self.somename
                 or getattr(self, "_" + attr, False)  # Атрибут: self._somename
                 or getattr(
-                    self, f"_{_cls}__{attr}", _not_defined
+                    self,
+                    f"_{_cls}__{attr}",
+                    val.default if val.default is not val.empty else _not_defined,
                 ),  # Атрибут: self.__somename
                 getattr(value, "__module__", ""),
                 # Если '__name__' отсутствует, атрибут возвращает сам себя
                 getattr(value, "__name__", value),
             )
-            for attr in inspect.signature(self.__init__).parameters.keys()
+            for attr, val in inspect.signature(self.__init__).parameters.items()
         )
         return "".join(
             (
@@ -329,7 +336,6 @@ class Timers:
             (k, v) for k, v in kwargs.items() if k in func_signature.parameters.keys()
         )
         # Формируем строку аргументов и их значений, переданных в вызываемый объект
-        _str: str = ""
         try:
             _str: str = ", ".join(
                 f"{arg_name}={arg_value}"
@@ -338,7 +344,7 @@ class Timers:
                 ).arguments.items()
             )
         except Exception:
-            pass
+            _str = ""
         return _str
 
     @staticmethod
@@ -569,7 +575,13 @@ class MiniTimers:
 
     def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
         # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
-        self.__func_signature = f"{getattr(func, '__module__', '')}.{getattr(func, '__name__', func)}({Timers._get_func_parameters(func, *args, **kwds)})"
+        func_module = (
+            func_module + "."
+            if (func_module := getattr(func, "__module__", ""))
+            and func_module != "__main__"
+            else ""
+        )
+        self.__func_signature = f"{func_module}{getattr(func, '__name__', func)}({Timers._get_func_parameters(func, *args, **kwds)})"
 
         match self.timer:
             case "Timer" | "Call":
@@ -655,4 +667,20 @@ class MiniTimers:
 
 
 if __name__ == "__main__":
+    tmr = Timers()
+
+    # @tmr.wrapper
+    def countdown(n, t=0):
+        while n > 0:
+            n -= 1
+
+    def listcomp(N):
+        [х * 2 for х in range(N)]
+
+    # print(MiniTimers(listcomp, 1000000, repeat=10, timer="Best"))
+    # tmr(listcomp, 1000000, repeat=10, timer="Best")
+    tmr(countdown, 50000, repeat=100, timer="Best")
+    # import demo
+
+    # tmr(demo.is_int, 10, repeat=100, timer="Best")
     pass

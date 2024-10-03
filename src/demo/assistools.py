@@ -374,17 +374,29 @@ class WarningToConsole:
         self.__logger: logging.Logger = logging.getLogger(
             __name__ if logname is None else logname
         )
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.WARNING)
-        formatter = logging.Formatter(
-            "{asctime} [{levelname}] - {message}"
-            if logname is None
-            else "{asctime} [{levelname}] — {name} - {message}",
-            datefmt="%d-%m-%Y %H:%M:%S",
-            style="{",
-        )
-        handler.setFormatter(formatter)
-        self.__logger.addHandler(handler)
+        if self.__logger.getEffectiveLevel() > logging.WARNING:
+            self.__logger.setLevel(logging.WARNING)
+        # Формируем уникальное имя handler-ра для конкретного логгера
+        handler_name: str = f"_{self.__logger.name}__{id(self.__logger)}"
+        # Предотвращаем дублирование handler-ра
+        if handler_name not in set(
+            handler.name
+            for handler in self.__logger.handlers
+            if handler.name is not None
+        ):
+            formatter = logging.Formatter(
+                "{asctime} [{levelname}] - {message}"
+                if logname is None
+                else "{asctime} [{levelname}] — {name} - {message}",
+                datefmt="%d-%m-%Y %H:%M:%S",
+                style="{",
+            )
+            handler = logging.StreamHandler(sys.stdout)
+            handler.set_name(handler_name)
+            handler.setLevel(logging.WARNING)
+            handler.setFormatter(formatter)
+            self.__logger.addHandler(handler)
+
         if msg is not None:
             self.warning(msg)
 
