@@ -133,7 +133,7 @@ class Timers:
     ) -> Any:
         """Вычисляет время выполнения заданной функции с аргументами за N повторов.
         Измеренное время доступно через свойства time_xxxx. Неявно можно передать настроечные
-        параметры time_source, repeat, is_accumulate и is_show в виде именованных аргументов,
+        параметры time_source, repeat, is_accumulate, is_show и logger в виде именованных аргументов,
         иначе будут использованы значения соответствующих свойств экземпляра класса.
         Неявные настроечные параметры действуют единоразово только на момент вызова метода и
         не меняют параметры, заданные при инициализации экземпляра класса Timers.
@@ -153,6 +153,7 @@ class Timers:
             repeat (int): Количество повторных запусков вызываемого объекта. Default: self.repeat
             is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: self.is_accumulate
             is_show (bool): Флаг, разрешающий вывод результатов измерений на консоль. Default: self.is_show
+            logger (Logger): Вывод результатов замеров в заданный поток. Default: self.logger
 
         Raises:
             RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
@@ -161,12 +162,32 @@ class Timers:
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
         """
-        # Извлекаем из входных аргументов настроечные параметры для time_source, _is_accumulate, is_show и repeat,
-        # если они были заданы, иначе используем настройки текущего экземпляра класса Timers
-        _time_source: Callable = kwds.pop("time_source", self.time_source)
-        _is_accumulate: bool = kwds.pop("is_accumulate", self.is_accumulate)
-        _is_show: bool = kwds.pop("is_show", self.is_show)
-        _repeat: int = kwds.pop("repeat", self.repeat)
+        # Формируем список параметров с их значениями по-умолчанию,
+        # которые передаются в метод __init__ при создании экземпляра класса.
+        # Если значение по-умолчанию не задано, подставляется пустой object.
+        init_args = (
+            (arg, value.default if value.default is not value.empty else object())
+            for arg, value in inspect.signature(self.__init__).parameters.items()
+        )
+        # Для каждого из полученных параметров выполняем три шага:
+        # - пытаемся получить значение из входных параметров метода __call__ из kwds
+        # - иначе пытаемся получить значение из атрибута экземпляра класса Timers
+        # - иначе подставляем значение по-умолчанию, заданное в методе __init__
+        # В итоге будет сформирован словарь из имен параметров и их значений
+        _vars = dict(
+            (
+                arg,
+                kwds.pop(
+                    arg,
+                    getattr(self, arg, False)
+                    or getattr(self, "_" + arg, False)
+                    or getattr(self, f"_{self.__class__.__name__}__{arg}", default),
+                ),
+            )
+            for arg, default in init_args
+        )
+        # Из полученного словаря формируем именованный кортеж для удобства
+        vars = collections.namedtuple("Vars", _vars.keys())(**_vars)
 
         result: Any = None
         # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
@@ -176,24 +197,24 @@ class Timers:
         try:
             match timer:
                 case "Timer" | "Call":
-                    _time = _time_source()
+                    _time = vars.time_source()
                     result = func(*args, **kwds)
-                    _time = _time_source() - _time
-                    if _is_accumulate:
+                    _time = vars.time_source() - _time
+                    if vars.is_accumulate:
                         _time += self.__timers.time(timer)
                 case "Total" | "Average":
-                    _time = _time_source()
+                    _time = vars.time_source()
                     # itertools.repeat быстрее range
-                    for _ in repeat(None, _repeat):
+                    for _ in repeat(None, vars.repeat):
                         result = func(*args, **kwds)
-                    _time = _time_source() - _time
+                    _time = vars.time_source() - _time
                     if timer == "Average":
-                        _time = _time / _repeat
+                        _time = _time / vars.repeat
                 case "Best":
-                    for _ in repeat(None, _repeat):
-                        _elapsed_time: float = _time_source()
+                    for _ in repeat(None, vars.repeat):
+                        _elapsed_time: float = vars.time_source()
                         result = func(*args, **kwds)
-                        _elapsed_time = _time_source() - _elapsed_time
+                        _elapsed_time = vars.time_source() - _elapsed_time
                         if _elapsed_time < _time:
                             _time = _elapsed_time
                 case _:
@@ -203,8 +224,8 @@ class Timers:
         else:
             _log: str = f"{timer} time [{func_signature} -> {result}] = {_time}"
             self.__timers.save(timer, _time, _log)
-            if _is_show:
-                self.logger.info(_log)
+            if vars.is_show:
+                vars.logger.info(_log)
 
         return result
 
