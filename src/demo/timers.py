@@ -249,14 +249,16 @@ class Timers:
                 # 'or' возвращает первый getattr, который успешен. Иначе _not_defined
                 value := getattr(self, attr, False)  # Атрибут: self.somename
                 or getattr(self, "_" + attr, False)  # Атрибут: self._somename
+                # Атрибут: self.__somename
                 or getattr(
                     self,
                     f"_{_cls}__{attr}",
                     val.default if val.default is not val.empty else _not_defined,
-                ),  # Атрибут: self.__somename
+                ),
                 getattr(value, "__module__", ""),
                 # Если '__name__' отсутствует, атрибут возвращает сам себя
-                getattr(value, "__name__", value),
+                getattr(value, "__qualname__", False)
+                or getattr(value, "__name__", value),
             )
             for attr, val in inspect.signature(self.__init__).parameters.items()
         )
@@ -268,7 +270,7 @@ class Timers:
                     # Если у объекта есть поле __name__, выводим его содержимое
                     # Иначе выводим объект как есть
                     # Отбираем те параметры, которые удалось идентифицировать
-                    f"{attr} = {f'{module}.{name}' if module else value}"
+                    f"{attr} = {f'{module}.{name}' if module else value!r}"
                     for attr, value, module, name in get_init_parameters
                     if value is not _not_defined
                 ),
@@ -677,9 +679,9 @@ if __name__ == "__main__":
     def listcomp(N):
         [х * 2 for х in range(N)]
 
-    # print(MiniTimers(listcomp, 1000000, repeat=10, timer="Best"))
+    print(MiniTimers(listcomp, 1000000, repeat=10, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    tmr(countdown, 50000, repeat=100, timer="Best")
+    # tmr(countdown, 50000, repeat=100, timer="Best")
     # import demo
 
     # tmr(demo.is_int, 10, repeat=100, timer="Best")
