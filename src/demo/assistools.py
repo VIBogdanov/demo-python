@@ -464,6 +464,37 @@ def rinda_multiplication(a: int, b: int) -> int:
 
 
 # -------------------------------------------------------------------------------------------------
+def inumber_to_digits(number: Any) -> list[int]:
+    """Функция преобразования целого числа в набор цифр.
+
+    Example:
+        1. inumber_to_digits(7362) -> [7, 3, 6, 2]
+        2. inumber_to_digits(7362.7) -> [7, 3, 6, 2]
+        3. inumber_to_digits('number') -> []
+
+    Args:
+        number (Any): Заданное целое число.
+
+    Returns:
+        list[int]: Список цифр.
+    """
+    try:
+        number = int(number)
+    except Exception:
+        return []
+
+    def get_digits(num: int) -> Generator[int, Any, None]:
+        yield num % 10
+        while num := num // 10:
+            yield num % 10
+
+    # Знак числа отбрасываем
+    if number < 0:
+        number = ~number + 1
+    return list(get_digits(number))[::-1]
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print(
         "\n- Формирует список индексов диапазонов, на которые можно разбить список заданной длины."
