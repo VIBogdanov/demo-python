@@ -5,7 +5,7 @@ from collections import Counter, defaultdict, deque
 from collections.abc import Generator, Iterable, Iterator
 from enum import Enum
 from itertools import chain, groupby, permutations
-from typing import Literal, TypeAlias, TypeVar, cast
+from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
 # Но это ограничивает независимый запуск файла puzzles.py, который в составе модуля
@@ -724,6 +724,75 @@ def get_max_from_min_difference(
 
 
 # -------------------------------------------------------------------------------------------------
+class MaxSeqLen(NamedTuple):
+    """Вспомогательная структура для функции get_max_sequence_length()"""
+
+    sequence_len: int
+    first_idx: int
+    last_idx: int
+
+
+def get_max_sequence_length(
+    sequence: Iterable[Any], symbol: Any, quantity: int
+) -> MaxSeqLen | None:
+    """Поиск подпоследовательности максимальной длины, в которой содержится заданное количество
+    символов не обязательно стоящих рядом.
+
+    Args:
+        sequence (Iterable[Any]): Последовательность символов
+        symbol (Any): Искомый символ
+        quantity (int): Требуемое количество символов
+
+    Returns:
+        (MaxSeqLen | None): Длина подпоследовательности, начальный индекс, конечный индекс.
+        None - подпоследовательность не найдена.
+    """
+
+    # Функция-генератор для поиска всех последовательностей с заданным символом и его количеством
+    def sequence_length(
+        sequence: Iterable[Any], symbol: Any, quantity: int
+    ) -> Generator[MaxSeqLen, Any, None]:
+        # Очередь для хранения начальных индексов
+        # Например для последовательности 'AZBZCZDZEEE' будут сгенерированы индексы: -1, 1, 3, 5, 7, 11
+        # Первый и последний индексы - это охватывающие индексы за пределами последовательности, чтобы
+        # учесть начальные и последние символы до и после искомого символа.
+        # При количестве символов = 3, начальные индексы - -1, 1, 3
+        idx_store: deque[int] = deque()
+        # Самый первый индекс находится за пределами последовательности
+        idx_store.append(-1)
+        # Подсчитываем количество найденных символов
+        _count: int = 0
+        # Перебираем все символы заданной последовательности, одновременно индексируя их
+        for idx, symb in enumerate(sequence):
+            # Если искомы символ обнаружен
+            if symb == symbol:
+                # Если количество ранее найденных искомых символов сравнялось с требуемым
+                if _count == quantity:
+                    # Возвращаем длину найденной подпоследовательности, ее начальный и конечный индексы
+                    # При этом из очереди извлекается самый наименьший начальный индекс
+                    start_idx: int = idx_store.popleft() + 1
+                    yield MaxSeqLen(idx - start_idx, start_idx, idx - 1)
+                else:
+                    # Если требуемое количество символов еще не найдено, подсчитываем найденный символ
+                    _count += 1
+                # Индекс очередного найденного символа сохраняем в очереди
+                idx_store.append(idx)
+        # Когда заданная последовательность заканчивается, обязательно следует учесть остаток символов
+        # в 'хвосте' после последнего найденного символа. В данном примере это 'EEE'. При этом idx
+        # будет указывать на последнюю 'E'
+        if _count == quantity:
+            start_idx = idx_store.popleft() + 1
+            yield MaxSeqLen(idx + 1 - start_idx, start_idx, idx)
+
+    # Возвращаем кортеж. Максимум ищем по первому значению кортежа - длина подпоследовательности
+    return max(
+        (ln for ln in sequence_length(sequence, symbol, quantity)),
+        key=lambda item: item.sequence_len,
+        default=None,
+    )
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
     print(
@@ -775,6 +844,13 @@ def main():
     )
     print(
         f" get_max_from_min_difference(3, 3, [1, 1, 1, 2, 2, 2, 2, 10, 10]) -> {get_max_from_min_difference(3, 3, [1, 1, 1, 2, 2, 2, 2, 10, 10])}"
+    )
+
+    print(
+        "\n- Поиск подпоследовательности максимальной длины, в которой содержится заданное количество символов."
+    )
+    print(
+        f" get_max_sequence_length('AZBZCZDZEEE', 'Z', 3) -> {get_max_sequence_length('AZBZCZDZEEE', 'Z', 3)}"
     )
 
 
