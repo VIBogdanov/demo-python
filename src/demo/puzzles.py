@@ -786,7 +786,7 @@ def get_max_sequence_length(
 
     # Возвращаем кортеж. Максимум ищем по первому значению кортежа - длина подпоследовательности
     return max(
-        (ln for ln in sequence_length(sequence, symbol, quantity)),
+        sequence_length(sequence, symbol, quantity),
         key=lambda item: item.sequence_len,
         default=None,
     )
