@@ -679,7 +679,17 @@ if __name__ == "__main__":
     def listcomp(N):
         [х * 2 for х in range(N)]
 
-    print(MiniTimers(listcomp, 1000000, repeat=10, timer="Best"))
+    n = 10_000_000
+
+    def s1():
+        _ = sum(1 for i in range(1, n + 1) if n % i == 0)
+
+    def s2():
+        _ = sum(n % i == 0 for i in range(1, n + 1))
+
+    tmr(s1, repeat=100, timer="Best")
+    tmr(s2, repeat=100, timer="Best")
+    # print(MiniTimers(s1, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
     # tmr(countdown, 50000, repeat=100, timer="Best")
     # import demo
