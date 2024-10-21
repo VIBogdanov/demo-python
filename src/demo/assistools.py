@@ -353,6 +353,7 @@ def ilen(iterable: Iterable) -> int:
     # счетчика iter_counter и никаких данных не хранит.
     deque(zip(iterable, iter_counter), 0)
     # Возвращаем значение счетчика. Т.к. отсчет ведется с нуля, прибавляем единицу
+    # return sum(1 for _ in iterable) # Альтернативный вариант
     return next(iter_counter)
 
 
@@ -492,6 +493,35 @@ def inumber_to_digits(number: Any) -> list[int]:
     if number < 0:
         number = ~number + 1
     return list(get_digits(number))[::-1]
+
+
+# -------------------------------------------------------------------------------------------------
+def inumber_to_digits2(number: Any) -> tuple[int]:
+    """Функция преобразования целого числа в список цифр.
+    Альтернативный вариант. Используется итератор для генерации цифр.
+
+    Args:
+        number (Any): Заданное целое число.
+
+    Returns:
+        tuple[int]: Список цифр.
+    """
+    try:
+        number = int(number)
+    except Exception as exc:
+        raise ValueError(f"impossible to represent {number} as an integer") from exc
+
+    # Функция раскладывает число на цифры. Знак числа отбрасывается
+    # Как только цифры закончатся, вернет None
+    def get_digits():
+        # Состояние между вызовами сохраняем в атрибуте 'num'
+        # Инициализируем атрибут стартовым кортежем (number, 0)
+        get_digits.num = getattr(get_digits, "num", (abs(number), 0))
+        get_digits.num = divmod(get_digits.num[0], 10)
+        return get_digits.num[1] if get_digits.num != (0, 0) else None
+
+    # Итератор вызывает функцию до тех пор, пока не получит None
+    return (*iter(get_digits, None),)[::-1]
 
 
 # -------------------------------------------------------------------------------------------------
