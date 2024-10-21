@@ -790,6 +790,38 @@ def get_max_sequence_length(
 
 
 # -------------------------------------------------------------------------------------------------
+
+
+def get_max_lenseq_symbol(sequence: Iterable[Any], symbol: Any) -> int:
+    """Определить длину самой длинной последовательности, состоящей из заданного символа.
+
+    Args:
+        sequence (Iterable[Any]): Набор символов.
+        symbol (Any): Искомый символ.
+
+    Returns:
+        int: Длина максимальной последовательности.
+    """
+    max_len: int = 0
+    start_idx: int = -1
+
+    for idx, val in enumerate(sequence):
+        match (val == symbol, start_idx < 0):
+            # Находим очередную подпоследовательности
+            case (True, True):
+                # Устанавливаем стартовый индекс на начало этой подпоследовательности
+                start_idx = idx
+            # Подпоследовательность закончилась
+            case (False, False):
+                # Вычисляем длину этой подпоследовательности и выбираем максимальную
+                max_len = max(max_len, idx - start_idx)
+                # Сбрасываем стартовый индекс
+                start_idx = -1
+    # Для крайней подпоследовательности, если присутствует, вычисляем максимум
+    return max_len if start_idx < 0 else max(max_len, idx - start_idx + 1)
+
+
+# -------------------------------------------------------------------------------------------------
 def main():
     print("\n- Сформировать все возможные уникальные наборы чисел из указанных цифр.")
     print(
@@ -848,6 +880,13 @@ def main():
     )
     print(
         f" get_max_sequence_length('AZBZCZDZEEE', 'Z', 3) -> {get_max_sequence_length('AZBZCZDZEEE', 'Z', 3)}"
+    )
+
+    print(
+        "\n- Определить длину самой длинной последовательности, состоящей из заданного символа."
+    )
+    print(
+        f" get_max_lenseq_symbol('AAAAANNNKKKAAAAALLLAAAAAAAAAA', 'A') -> {get_max_lenseq_symbol('AAAAANNNKKKAAAAALLLAAAAAAAAAA', 'A')}"
     )
 
 
