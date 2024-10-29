@@ -679,7 +679,7 @@ def get_qty_elements_uncross(
     Example:
         1. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2) -> (0, 1) (2, 3) (4, 5)
         2. get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, 2) -> (0, 2) (4, 6)
-        3. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, 0) -> (0, 1) (2, 3) (4, 5)
+        3. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, 0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
 
     Args:
         data (Iterable): Список данных.
@@ -690,9 +690,10 @@ def get_qty_elements_uncross(
         Generator[Any, Any, None]: Последовательность кортежей с заданным количеством значений.
     """
     # Базовый итератор с заданным смещением
-    data_iter = itertools.islice(data, 0, None, offset if offset > 0 else 1)
+    if offset != 0:
+        data = itertools.islice(data, 0, None, abs(offset))
     # Количество итераторов по базовому итератору, равное количеству отбираемых значений
-    iters = (itertools.islice(data_iter, 0, None) for _ in range(qty))
+    iters = (itertools.islice(data, 0, None) for _ in range(qty))
     # Генерация кортежей с отобранными значениями
     yield from zip(*iters)
 
