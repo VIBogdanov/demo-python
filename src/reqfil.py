@@ -139,9 +139,7 @@ def get_phrase(
                 # Якорные слова обязательно должны присутствовать в списке комбинаций
                 phrase_combo_words.append(phrase_fix_words)
             else:  # иначе просто подгружаем тот список слов, который не пуст
-                phrase_combo_words.append(
-                    phrase_words if phrase_words else phrase_fix_words
-                )
+                phrase_combo_words.append(phrase_words.union(phrase_fix_words))
         case CompareType.Any:
             # Просто добавляем список всех слов поисковой фразы. Комбинировать не нужно
             phrase_combo_words.append(set(word.lower() for word in phrase_words_clear))

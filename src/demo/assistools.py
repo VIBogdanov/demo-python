@@ -56,22 +56,24 @@ def type_checking(*type_args, **type_kwargs):
                 *args, **kwargs
             ).arguments.items():
                 # Если для данного аргумента задана проверка типа
-                if arg_name in args_types:
-                    # Если тип значения аргумента не соответствует заданному в декораторе
-                    if not isinstance(arg_value, arg_types := args_types[arg_name]):
-                        # Для join нужен кортеж
-                        arg_types = (
-                            arg_types
-                            if isinstance(arg_types, Iterable)
-                            else (arg_types,)
+                # И тип значения аргумента не соответствует заданному в декораторе
+                if arg_name in args_types and not isinstance(
+                    arg_value, arg_types := args_types[arg_name]
+                ):
+                    # Для join нужен кортеж
+                    arg_types = (
+                        arg_types if isinstance(arg_types, Iterable) else (arg_types,)
+                    )
+                    # Собираем строку вида 'typename or typename ...'
+                    arg_types_name = " or ".join(
+                        # Если '__qualname__' или '__name__' отсутствуют, класс типа возвращает сам себя
+                        str(
+                            getattr(arg_type, "__qualname__", False)
+                            or getattr(arg_type, "__name__", arg_type)
                         )
-                        # Собираем строку вида 'typename or typename ...'
-                        arg_type = " or ".join(
-                            # Если '__name__' отсутствует, класс типа возвращает сам себя
-                            str(getattr(arg_type, "__name__", arg_type))
-                            for arg_type in arg_types
-                        )
-                        raise TypeError(f"Argument '{arg_name}' must be {arg_type}")
+                        for arg_type in arg_types
+                    )
+                    raise TypeError(f"Argument '{arg_name}' must be {arg_types_name}")
             # Проверка типов пройдена успешно. Вызываем оригинальную функцию
             return func(*args, **kwargs)
 
@@ -550,7 +552,7 @@ def unpack_fast(*args: object) -> Generator[object, Any, None]:
         match arg:
             # Если это итерируемый объект (но не строка)
             # Распаковываем и помещаем в конец очереди после _stop
-            case Iterable() if not isinstance(arg, str):
+            case Iterable() if not isinstance(arg, (str, bytes)):
                 args_buff.extend(arg)
             # Строки и не итерируемые объекты помещаем в очередь до _stop
             case _:
@@ -579,11 +581,13 @@ def unpack_small(*args: object) -> Generator[object, Any, None]:
     iters_buff.append(iter(args))
     while iters_buff:
         match obj := iters_buff.popleft():
-            case Iterable() if not isinstance(obj, str):
+            case Iterable() if not isinstance(obj, (str, bytes)):
                 i = 0
                 # Разбираем итерируемый объект
                 for _obj in obj:
-                    if isinstance(_obj, Iterable) and not isinstance(_obj, str):
+                    if isinstance(_obj, Iterable) and not isinstance(
+                        _obj, (str, bytes)
+                    ):
                         # Внутри может оказаться еще один итерируемый объект
                         iters_buff.insert(i, iter(_obj))
                         i += 1
@@ -620,14 +624,15 @@ def unpack_least(*args: object) -> Generator[object, Any, None]:
         # Получаем по id содержимое объекта
         match arg := ctypes.cast(iters_buff.popleft(), ctypes.py_object).value:
             # Если это итерируемый объект (но не строка)
-            case Iterable() if not isinstance(arg, str):
+            case Iterable() if not isinstance(arg, (str, bytes)):
                 # Распаковываем объект, при этом индексируем
                 i = 0
                 for _arg in arg:
                     # Внутри может оказаться еще один итерируемый объект
                     # Либо сохраняем не итерируемый объект на своем порядковом месте
                     if (
-                        isinstance(_arg, Iterable) and not isinstance(_arg, str)
+                        isinstance(_arg, Iterable)
+                        and not isinstance(_arg, (str, bytes))
                     ) or i > 0:
                         iters_buff.insert(i, id(_arg))
                         i += 1
