@@ -4,9 +4,10 @@ import inspect
 import itertools
 import logging
 import multiprocessing
+import re
 import sys
 from collections import Counter, OrderedDict, deque
-from collections.abc import Generator, Iterable, Iterator, Sequence, Sized
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
 from typing import Any
 
 from demo.timers import MiniTimers
@@ -648,7 +649,7 @@ def unpack_least(*args: object) -> Generator[object, Any, None]:
 
 
 def get_qty_elements_cross(
-    data: Iterable, qty: int, offset: int = 1
+    data: Iterable, qty: int, *, offset: int = 1
 ) -> Generator[Any, Any, None]:
     """Последовательно выбирает заданное количество значений из списка данных. При этом диапазона выбранных
     значений накладываются друг на друга. Например: (0, 1, 2) (1, 2, 3) (2, 3, 4) (3, 4, 5)...
@@ -676,7 +677,7 @@ def get_qty_elements_cross(
 
 
 def get_qty_elements_uncross(
-    data: Iterable, qty: int, offset: int = 1
+    data: Iterable, qty: int, *, offset: int = 1
 ) -> Generator[Any, Any, None]:
     """Последовательно выбирает заданное количество значений из списка данных. При этом диапазона выбранных
     значений не пересекаются. Например: (0, 1, 2) (3, 4, 5) (6, 7, 8) (9, 10, 11)...
@@ -692,7 +693,7 @@ def get_qty_elements_uncross(
         offset (Iterable): Смещение между значениями.
 
     Returns:
-        Generator[Any, Any, None]: Последовательность кортежей с заданным количеством значений.
+        Generator([Any, Any, None]): Последовательность кортежей с заданным количеством значений.
     """
     # Базовый итератор с заданным смещением
     if offset != 0:
@@ -701,6 +702,57 @@ def get_qty_elements_uncross(
     iters = (itertools.islice(data, 0, None) for _ in range(qty))
     # Генерация кортежей с отобранными значениями
     yield from zip(*iters)
+
+
+# -------------------------------------------------------------------------------------------------
+def string2number(
+    data: str,
+    *,
+    typenum: object = int,
+    rounding: bool = True,
+    repattern: str = "",
+) -> Generator[Any, Any, None]:
+    """Функция-генератор извлекает из строки числа и конвертирует их в заданный числовой тип. В заданной строке
+    может быть либо одно число, либо множество.
+
+    Args:
+        data (str): Строка с числами.
+        typenum (object): Получаемый тип числа.
+        rounding (bool): Требуется ли арифметическое округление.
+        repattern (str): Регулярное выражение для поиска чисел.
+
+    Returns:
+        Generator([Any, Any, None]): Последовательность чисел заданного типа.
+    """
+    # Если в параметрах задано регулярное выражение для поиска чисел, используем его.
+    # Иначе используем выражение по-умолчанию.
+    repattern = (
+        repattern if repattern else r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+    )
+    # Компилируем выражение для многократного использования
+    rc: re.Pattern[str] = re.compile(repattern)
+    # Просматриваем все найденные числа в строке
+    for snum in rc.finditer(data):
+        try:
+            fnum = float(snum[0])
+        except Exception:
+            pass
+        else:
+            # Тип числа может быть задан как float, так и как float()
+            if typenum is float or isinstance(typenum, float):
+                yield fnum
+            elif typenum is int or isinstance(typenum, int):
+                # Для int применимо понятие округления
+                if rounding:
+                    fnum += -0.5 if fnum < 0 else 0.5
+                yield int(fnum)
+            else:
+                # Пытаемся получить число заданного типа
+                try:
+                    if isinstance(typenum, Callable):
+                        yield typenum(fnum)
+                except Exception:
+                    pass
 
 
 # -------------------------------------------------------------------------------------------------
