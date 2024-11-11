@@ -8,7 +8,7 @@ import re
 import sys
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
-from typing import Any
+from typing import Any, Self
 
 from demo.timers import MiniTimers
 
@@ -407,6 +407,12 @@ class WarningToConsole:
 
     def __call__(self, msg: str) -> None:
         self.warning(msg)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc) -> None:
+        return None
 
     def warning(self, *args: Any, **kwargs: Any) -> None:
         self.__logger.warning(*args, **kwargs)
