@@ -475,7 +475,7 @@ def rinda_multiplication(a: int, b: int) -> int:
 
 
 # -------------------------------------------------------------------------------------------------
-def inumber_to_digits(number: Any) -> list[int]:
+def inumber_to_digits(number: Any) -> Iterator[int]:
     """Функция преобразования целого числа в список цифр.
 
     Example:
@@ -491,8 +491,8 @@ def inumber_to_digits(number: Any) -> list[int]:
     """
     try:
         number = int(number)
-    except Exception:
-        return []
+    except Exception as exc:
+        raise ValueError(f"impossible to represent {number} as an integer") from exc
 
     def get_digits(num: int) -> Generator[int, Any, None]:
         yield num % 10
@@ -502,11 +502,11 @@ def inumber_to_digits(number: Any) -> list[int]:
     # Знак числа отбрасываем
     if number < 0:
         number = ~number + 1
-    return list(get_digits(number))[::-1]
+    return reversed((*get_digits(number),))
 
 
 # -------------------------------------------------------------------------------------------------
-def inumber_to_digits2(number: Any) -> tuple[int]:
+def inumber_to_digits2(number: Any) -> tuple[int, ...]:
     """Функция преобразования целого числа в список цифр.
     Альтернативный вариант. Используется итератор для генерации цифр.
 
@@ -547,31 +547,20 @@ def unpack_fast(*args: object) -> Generator[object, Any, None]:
     Returns:
         Generator[object, Any, None]: Генерирует распакованные объекты.
     """
-    # Объект _stop делит очередь пополам
-    # До _stop уже обработанные распакованные объекты
-    # После _stop объекты, требующие обработки и распаковки
-    _stop = object()
-    args_buff: deque[object] = deque()
-    args_buff.append(_stop)
     # Загружаем в очередь все полученные функцией объекты
-    args_buff.extend(args)
-    while (arg := args_buff.pop()) != _stop:
-        match arg:
-            # Если это итерируемый объект (но не строка)
-            # Распаковываем и помещаем в конец очереди после _stop
-            case Iterable() if not isinstance(arg, (str, bytes)):
-                args_buff.extend(arg)
-            # Строки и не итерируемые объекты помещаем в очередь до _stop
-            case _:
-                args_buff.appendleft(arg)
-    # В итоге в начале очереди получим упорядоченные распакованне объекты
+    args_buff: deque[object] = deque(args)
     while args_buff:
-        yield args_buff.popleft()
+        arg = args_buff.popleft()
+        # Если это итерируемый объект (но не строка)
+        if isinstance(arg, Iterable) and not isinstance(arg, (str, bytes)):
+            # Распаковываем и помещаем в начало очереди
+            args_buff.extendleft(reversed(tuple(arg)))
+        else:
+            # Отдаем не итерируемый объект
+            yield arg
 
 
 # -------------------------------------------------------------------------------------------------
-
-
 def unpack_small(*args: object) -> Generator[object, Any, None]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
     вложенности в плоский список.
@@ -662,8 +651,8 @@ def get_qty_elements_cross(
 
     Example:
         1. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2) -> (0, 1) (1, 2) (2, 3) (3, 4) (4, 5)
-        2. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, 2) -> (0, 2) (1, 3) (2, 4) (3, 5)
-        3. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, 0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
+        2. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=2) -> (0, 2) (1, 3) (2, 4) (3, 5)
+        3. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
 
     Args:
         data (Iterable): Список данных.
@@ -690,8 +679,8 @@ def get_qty_elements_uncross(
 
     Example:
         1. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2) -> (0, 1) (2, 3) (4, 5)
-        2. get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, 2) -> (0, 2) (4, 6)
-        3. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, 0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
+        2. get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, offset=2) -> (0, 2) (4, 6)
+        3. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, offset=0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
 
     Args:
         data (Iterable): Список данных.
@@ -702,10 +691,9 @@ def get_qty_elements_uncross(
         Generator([Any, Any, None]): Последовательность кортежей с заданным количеством значений.
     """
     # Базовый итератор с заданным смещением
-    if offset != 0:
-        data = itertools.islice(data, 0, None, abs(offset))
+    _data = itertools.islice(data, 0, None, abs(offset)) if offset else data
     # Количество итераторов по базовому итератору, равное количеству отбираемых значений
-    iters = (itertools.islice(data, 0, None) for _ in range(qty))
+    iters = (itertools.islice(_data, 0, None) for _ in range(qty))
     # Генерация кортежей с отобранными значениями
     yield from zip(*iters)
 
