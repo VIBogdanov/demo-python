@@ -1,3 +1,4 @@
+import bisect
 import functools
 import itertools
 from collections import defaultdict, deque
@@ -854,6 +855,55 @@ def find_pairs_sum(
 
 
 # --------------------------------------------------------------------------------------------
+
+
+def get_Nth_item(
+    data: Iterable[Any],
+    position: int,
+    type: Literal["smallest", "largest"] = "smallest",
+) -> Any:
+    """Find the N-th smallest or largest item in an unsorted data.
+
+    Args:
+        data (Iterable[Any]): any iterable unsorted data
+
+        position (int): ordinal position of the sought element
+
+        type: what are we looking for: smallest or largest. Default: smallest
+
+    Returns:
+        (Any): element at a given position
+
+    """
+    if position == 1:
+        return min(data) if type == "smallest" else max(data)
+
+    iter_data: Iterator[Any] = iter(data)
+    # Отбираем первые N элементов данных и сортируем их
+    slice_data: list[Any] = sorted(itertools.islice(iter_data, position))
+    # Если заданная позиция вне диапазона выборки, генерируем исключение
+    if position > 0 and position <= len(slice_data):
+        if type == "smallest":
+            # Индекс искомого элемента от начала выборки
+            index: int = position - 1
+            # Перебираем оставшиеся элементы данных кроме первых N
+            for element in iter_data:
+                if element < slice_data[index]:
+                    # Вставляем с сохранением сортировки
+                    bisect.insort(slice_data, element, lo=0, hi=index)
+        else:
+            # Индекс искомого элемента с конца выборки
+            index = -position
+            for element in iter_data:
+                if element > slice_data[index]:
+                    bisect.insort(slice_data, element)
+
+        return slice_data[index]
+    else:
+        raise IndexError("Position out of range")
+
+
+# --------------------------------------------------------------------------------------------
 def main():
     print(
         "\n- Функция нахождения наибольшего общего делителя двух целых чисел без перебора методом Евклида."
@@ -909,6 +959,13 @@ def main():
     print("\n- Поиск неповторяющихся пар чисел, сумма которых равна целевому значению.")
     print(
         f" find_pairs_sum([3, 1, 2, 3, 0, -2, -1, 5, 4, 7, 6], 5) -> {find_pairs_sum([3, 1, 2, 3, 0, -2, -1, 5, 4, 7, 6], 5)}"
+    )
+
+    print(
+        "\n- Найти N-ый наименьший или наибольший элемент в неотсортированном списке."
+    )
+    print(
+        f" get_Nth_item([8, 14, 5, 6, 4, 11, 26], 3) -> {get_Nth_item([8, 14, 5, 6, 4, 11, 26], 3)}"
     )
 
 
