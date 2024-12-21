@@ -5,9 +5,11 @@ import inspect
 import logging
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from itertools import repeat
-from typing import Any, Generator, Literal, Self, TypeAlias
+from typing import Any, Literal, Self, TypeAlias
+
+import demo
 
 TRepeat: TypeAlias = int | str | float
 TLogger: TypeAlias = logging.Logger | str | None
@@ -93,7 +95,7 @@ class _TimersTime:
 class Timers:
     """Класс-таймер, для замеров времени выполнения кода.
     Поддерживает как ручной запуск/останов: start()/stop(), так и менеджер контекста 'with'
-    и декорирование @Timer(). Реализован функционал замера производительности вызываемого
+    и декорирование @Timer().register. Реализован функционал замера производительности вызываемого
     объекта с параметрами с указанием количество повторных запусков (по-умолчанию 1000).
 
     Args:
@@ -118,7 +120,7 @@ class Timers:
         self.is_show = is_show
         self.repeat = repeat
         # Если logger не задан, создаем дефолтовый для класса Timers
-        self.logger = logger if logger is not None else self.__class__.__name__
+        self.logger = logger if logger is not None else type(self).__name__
         # Класс-хранилище всех измеряемых показателей времени
         self.__timers: _TimersTime = _TimersTime()
         # None - счетчик не запущен
@@ -178,7 +180,7 @@ class Timers:
                     or getattr(self, "_" + arg, False)
                     or getattr(
                         self,
-                        f"_{self.__class__.__name__}__{arg}",
+                        f"_{type(self).__name__}__{arg}",
                         val.default if val.default is not val.empty else object(),
                     ),
                 ),
@@ -189,14 +191,7 @@ class Timers:
         _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
         result: Any = None
-        # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
-        func_module = (
-            func_module + "."
-            if (func_module := getattr(func, "__module__", ""))
-            and func_module != "__main__"
-            else ""
-        )
-        func_signature: str = f"{func_module}{getattr(func, '__name__', func)}({self._get_func_parameters(func, *args, **kwds)})"
+        func_signature: str = f"{demo.get_object_modname(func)}({self._get_func_parameters(func, *args, **kwds)})"
         _time: float = float("inf")
 
         try:
@@ -237,17 +232,17 @@ class Timers:
     def __repr__(self) -> str:
         # На случай, когда не удалось получить значение параметра
         _not_defined = object()
-        _cls: str = self.__class__.__name__
+        _cls: str = type(self).__name__
         # Собираем из списка параметров метода __init__ строку инициализации экземпляра класса
         # с текущими значениями параметров, а не с переданными в момент инициализации (благодаря генератору)
         # Генератор формируем каждый раз заново, т.к. генератор одноразовый, а метод __repr__
         # может быть вызван многократно
         # Важно! Имя атрибута должно совпадать с именем параметра кроме начальных подчеркиваний
-        get_init_parameters: Generator[tuple[str, Any, str, Any], None, None] = (
+        get_init_parameters: Generator[tuple[str, Any], None, None] = (
             (
                 attr,  # Параметр: somename
                 # 'or' возвращает первый getattr, который успешен. Иначе _not_defined
-                value := getattr(self, attr, False)  # Атрибут: self.somename
+                getattr(self, attr, False)  # Атрибут: self.somename
                 or getattr(self, "_" + attr, False)  # Атрибут: self._somename
                 # Атрибут: self.__somename
                 or getattr(
@@ -255,10 +250,6 @@ class Timers:
                     f"_{_cls}__{attr}",
                     val.default if val.default is not val.empty else _not_defined,
                 ),
-                getattr(value, "__module__", ""),
-                # Если '__name__' отсутствует, атрибут возвращает сам себя
-                getattr(value, "__qualname__", False)
-                or getattr(value, "__name__", value),
             )
             for attr, val in inspect.signature(self.__init__).parameters.items()
         )
@@ -266,12 +257,9 @@ class Timers:
             (
                 f"{_cls}(",
                 ", ".join(
-                    # Если выводимый объект импортирован, добавляем имя модуля
-                    # Если у объекта есть поле __name__, выводим его содержимое
-                    # Иначе выводим объект как есть
                     # Отбираем те параметры, которые удалось идентифицировать
-                    f"{attr} = {f'{module}.{name}' if module else value!r}"
-                    for attr, value, module, name in get_init_parameters
+                    f"{attr} = {demo.get_object_modname(value)}"
+                    for attr, value in get_init_parameters
                     if value is not _not_defined
                 ),
                 ")",
@@ -296,17 +284,17 @@ class Timers:
         if self.__start_time is not None:
             self.stop()
 
-    def wrapper(self, func: Callable):
-        """Позволяет использовать класс как декоратор: @Timers().wrapper. При этом можно задать
+    def register(self, func: Callable):
+        """Позволяет использовать класс как декоратор: @Timers().register. При этом можно задать
         функцию источник времени и другие параметры для класса Timers.
         Допускается использовать один и тот же таймер и как декоратор, и как менеджер контекста и как ручной таймер.
         При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
 
         Например:
 
-        @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).wrapper.
+        @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).register.
         Альтернатива, предварительно создать экземпляр класса Timers, настроить необходимые параметры и
-        использовать экземпляр как декоратор: @instance.wrapper.
+        использовать экземпляр как декоратор: @instance.register.
 
         Параметр repeat для декоратора не используется и игнорируется.
         """
@@ -340,7 +328,7 @@ class Timers:
         # Формируем строку аргументов и их значений, переданных в вызываемый объект
         try:
             _str: str = ", ".join(
-                f"{arg_name}={arg_value}"
+                f"{arg_name}={arg_value!r}"
                 for arg_name, arg_value in func_signature.bind(
                     *args, **dict(_kwargs)
                 ).arguments.items()
@@ -399,20 +387,24 @@ class Timers:
         Returns:
             float: Время работы таймера.
         """
+        # Сразу же получаем текущее время, дабы минимизировать погрешность
+        _time: float = self.time_source()
+
         # Если таймер еще не был запущен
         if self.__start_time is None:
             raise TimerStopError
+        else:
+            _time -= self.__start_time
+            self.__start_time = None
+            # Обрабатываем таймер. Аккумулируем, формируем лог и сохраняем
+            _timer: TTimerType = "Timer"
+            if self.is_accumulate:
+                _time += self.__timers.time(_timer)
+            _log: str = f"{_timer} running time = {_time}"
+            self.__timers.save(_timer, _time, _log)
 
-        _time: float = self.time_source() - self.__start_time
-        self.__start_time = None
-
-        if self.is_accumulate:
-            _time += self.__timers.time("Timer")
-        _log: str = f"Timer running time = {_time}"
-        self.__timers.save("Timer", _time, _log)
-
-        if self.is_show:
-            self.logger.info(_log)
+            if self.is_show:
+                self.logger.info(_log)
 
         return self.time_timer
 
@@ -607,10 +599,10 @@ class MiniTimers:
     def __repr__(self) -> str:
         return "".join(
             (
-                f"{self.__class__.__name__}",
+                f"{type(self).__name__}",
                 "(func, *args, **kwds",
-                f", (timer={self.timer!r}",
-                f", (time_source={self.time_source!r}",
+                f", timer={self.timer!r}",
+                f", time_source={demo.get_object_modname(self.time_source)}",
                 f", repeat={self.repeat!r}",
                 ")",
             )
@@ -679,10 +671,11 @@ if __name__ == "__main__":
     def listcomp(N):
         [х * 2 for х in range(N)]
 
-    # print(MiniTimers(s1, repeat=1000, timer="Best"))
+    # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    # tmr(countdown, 50000, repeat=100, timer="Best")
-    # import demo
+    tmr(countdown, 50000, repeat=100, timer="Best")
 
+    # import demo
     # tmr(demo.is_int, 10, repeat=100, timer="Best")
+    print(repr(tmr))
     pass

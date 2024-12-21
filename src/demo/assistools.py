@@ -8,11 +8,34 @@ import re
 import sys
 from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
-from typing import Any, Self
+from typing import Any, Self, TypeVar
 
 from demo.timers import MiniTimers
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
+
+T = TypeVar("T")
+
+
+# --------------------------------------------------------------------------------------
+def get_object_name(obj: object) -> str:
+    """Возвращает имя объекта. Последовательно пытается извлечь имя из атрибутов
+    '__qualname__', '__name__' и '__repr__'.
+    """
+    return getattr(obj, "__qualname__", "") or getattr(obj, "__name__", "") or repr(obj)
+
+
+# --------------------------------------------------------------------------------------
+def get_object_modname(obj: object) -> str:
+    """Возвращает имя объекта с именем модуля. Если имя модуля не определено,
+    возвращает просто имя объекта"""
+    obj_name = get_object_name(obj)
+    mod_name = getattr(obj, "__module__", "")
+    return (
+        f"{mod_name}.{obj_name}"
+        if mod_name and mod_name not in ("__main__", "builtins")
+        else f"{obj_name}"
+    )
 
 
 # ---------------------Decorators-------------------------------------------------------
@@ -23,21 +46,21 @@ def type_checking(*type_args, **type_kwargs):
     Требуемый тип задается либо как отдельное значение, либо как кортеж типов.
 
     Examples:
-        >>>
-        @type_checking(int, (int, str), z=float)
-        def somefunction(x, y, z=4.5):
-            pass
+    >>> @type_checking(int, (int, str), z=float)
+    >>> def somefunction(x, y, z=4.5):
+    >>>     pass
         # Альтернативный вариант
-        @type_checking(y = (int, str), x = int)
-        def somefunction(x, y, z=4.5):
-            pass
+    >>> @type_checking(y = (int, str), x = int)
+    >>> def somefunction(x, y, z=4.5):
+    >>>     pass
         # Результат работы декоратора
-        somefunction(1, 3, z=123.5)   #OK
-        somefunction(1, '3', z=123.5)   #OK
-        somefunction(1, 3)   #OK
-        somefunction('1', 3, z=123.5)   #Error
-        somefunction(1, 3, z=123)   #Error for first variant
-        somefunction(1, 3.4)   #Error
+    >>> somefunction(1, 3, z=123.5)   #OK
+    >>> somefunction(1, '3', z=123.5)   #OK
+    >>> somefunction(1, 3)   #OK
+    >>> somefunction('1', 3, z=123.5)   #Error
+    >>> somefunction(1, 3, z=123)   #Error for first variant
+    >>> somefunction(1, 3.4)   #Error
+
     """
 
     def decorate(func):
@@ -57,22 +80,18 @@ def type_checking(*type_args, **type_kwargs):
                 *args, **kwargs
             ).arguments.items():
                 # Если для данного аргумента задана проверка типа
-                # И тип значения аргумента не соответствует заданному в декораторе
+                # и тип значения аргумента не соответствует заданному в декораторе
                 if arg_name in args_types and not isinstance(
                     arg_value, arg_types := args_types[arg_name]
                 ):
-                    # Для join нужен кортеж
-                    arg_types = (
-                        arg_types if isinstance(arg_types, Iterable) else (arg_types,)
-                    )
+                    # Для join нужен итерируемый объект
+                    try:
+                        arg_types = iter(arg_types)
+                    except TypeError:
+                        arg_types = iter((arg_types,))
                     # Собираем строку вида 'typename or typename ...'
                     arg_types_name = " or ".join(
-                        # Если '__qualname__' или '__name__' отсутствуют, класс типа возвращает сам себя
-                        str(
-                            getattr(arg_type, "__qualname__", False)
-                            or getattr(arg_type, "__name__", arg_type)
-                        )
-                        for arg_type in arg_types
+                        get_object_modname(arg_type) for arg_type in arg_types
                     )
                     raise TypeError(f"Argument '{arg_name}' must be {arg_types_name}")
             # Проверка типов пройдена успешно. Вызываем оригинальную функцию
@@ -487,7 +506,7 @@ def inumber_to_digits(number: Any) -> Iterator[int]:
         number (Any): Заданное целое число.
 
     Returns:
-        list[int]: Список цифр.
+        Iterator[int]: Список цифр.
     """
     try:
         number = int(number)
@@ -537,7 +556,7 @@ def inumber_to_digits2(number: Any) -> tuple[int, ...]:
 # -------------------------------------------------------------------------------------------------
 
 
-def unpack_fast(*args: object) -> Generator[object, Any, None]:
+def unpack_fast(*args: Any) -> Generator[Any, Any, None]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
     вложенности в плоский список.
 
@@ -545,10 +564,10 @@ def unpack_fast(*args: object) -> Generator[object, Any, None]:
     переданных данных. В худшем случае в очереди хранятся все распакованные объекты.
 
     Returns:
-        Generator[object, Any, None]: Генерирует распакованные объекты.
+        Generator[Any, Any, None]: Генерирует распакованные объекты.
     """
     # Загружаем в очередь все полученные функцией объекты
-    args_buff: deque[object] = deque(args)
+    args_buff: deque[Any] = deque(args)
     while args_buff:
         arg = args_buff.popleft()
         # Если это итерируемый объект (но не строка)
@@ -561,7 +580,7 @@ def unpack_fast(*args: object) -> Generator[object, Any, None]:
 
 
 # -------------------------------------------------------------------------------------------------
-def unpack_small(*args: object) -> Generator[object, Any, None]:
+def unpack_small(*args: Any) -> Generator[Any, Any, None]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
     вложенности в плоский список.
 
@@ -570,9 +589,9 @@ def unpack_small(*args: object) -> Generator[object, Any, None]:
     хранятся частично, а итераторы имеют фиксированные размер.
 
     Returns:
-        Generator[object, Any, None]: Генерирует распакованные объекты.
+        Generator[Any, Any, None]: Генерирует распакованные объекты.
     """
-    iters_buff: deque[object] = deque()
+    iters_buff: deque[Any] = deque()
     # Т.к. args - это кортеж, делаем из него итератор и помещаем в очередь
     iters_buff.append(iter(args))
     while iters_buff:
@@ -603,7 +622,7 @@ def unpack_small(*args: object) -> Generator[object, Any, None]:
 # -------------------------------------------------------------------------------------------------
 
 
-def unpack_least(*args: object) -> Generator[object, Any, None]:
+def unpack_least(*args: Any) -> Generator[Any, Any, None]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
     вложенности в плоский список.
 
@@ -611,7 +630,7 @@ def unpack_least(*args: object) -> Generator[object, Any, None]:
     хранятся исключительно id обрабатываемых объектов - целочисленные значения.
 
     Returns:
-        Generator[object, Any, None]: Генерирует распакованные объекты.
+        Generator[Any, Any, None]: Генерирует распакованные объекты.
     """
     iters_buff: deque[int] = deque()
     # Работаем только с id объектов
@@ -706,8 +725,7 @@ def string2number(
     rounding: bool = True,
     repattern: str = "",
 ) -> Generator[Any, Any, None]:
-    """Функция-генератор извлекает из строки числа и конвертирует их в заданный числовой тип. В заданной строке
-    может быть либо одно число, либо множество.
+    """Функция-генератор извлекает из строки числа и конвертирует их в заданный числовой тип.
 
     Args:
         data (str): Строка с числами.
@@ -720,33 +738,27 @@ def string2number(
     """
     # Если в параметрах задано регулярное выражение для поиска чисел, используем его.
     # Иначе используем выражение по-умолчанию.
-    repattern = (
-        repattern if repattern else r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-    )
+    if repattern:
+        _pattern: str = repattern
+    elif typenum is complex or isinstance(typenum, complex):
+        _pattern = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+|[-+]\d+[jJ])?"
+    else:
+        _pattern = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
     # Компилируем выражение для многократного использования
-    rc: re.Pattern[str] = re.compile(repattern)
+    rc: re.Pattern[str] = re.compile(_pattern)
     # Просматриваем все найденные числа в строке
     for snum in rc.finditer(data):
         try:
-            fnum = float(snum[0])
+            # Для int применимо понятие округление
+            if (typenum is int or isinstance(typenum, int)) and rounding:
+                _num = float(snum[0])
+                _num += -0.5 if _num < 0 else 0.5
+                yield int(_num)
+            # Пытаемся получить число заданного типа
+            elif isinstance(typenum, Callable):
+                yield typenum(snum[0])
         except Exception:
             pass
-        else:
-            # Тип числа может быть задан как float, так и как float()
-            if typenum is float or isinstance(typenum, float):
-                yield fnum
-            elif typenum is int or isinstance(typenum, int):
-                # Для int применимо понятие округления
-                if rounding:
-                    fnum += -0.5 if fnum < 0 else 0.5
-                yield int(fnum)
-            else:
-                # Пытаемся получить число заданного типа
-                try:
-                    if isinstance(typenum, Callable):
-                        yield typenum(fnum)
-                except Exception:
-                    pass
 
 
 # -------------------------------------------------------------------------------------------------

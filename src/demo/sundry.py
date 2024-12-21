@@ -8,6 +8,8 @@ from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar
 
 import demo
 
+TAny = TypeVar("TAny")
+
 
 # ------------------------------------------------------------------------------
 def find_intervals(
@@ -193,8 +195,8 @@ def find_item_by_binary(
     направление сортировки - по возрастанию или убыванию.
 
     Args:
-        elements (Sequence[Any]): Массив данных для поиска
-        target (Any): Значение, которое необходимо найти
+        elements (Sequence): Массив данных для поиска
+        target: Значение, которое необходимо найти
 
     Returns:
         (int | None): Функция возвращает индекс элемента в массиве, который равен искомому значению.

@@ -2,7 +2,7 @@ import array
 import functools
 import math
 from collections import Counter, defaultdict, deque
-from collections.abc import Generator, Iterable, Iterator
+from collections.abc import Generator, Hashable, Iterable, Iterator
 from enum import Enum
 from itertools import chain, groupby, permutations
 from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar, cast
@@ -11,22 +11,25 @@ from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar, cast
 # Но это ограничивает независимый запуск файла puzzles.py, который в составе модуля
 import demo
 
-T = TypeVar("T")
+TAny = TypeVar("TAny")
+THashable = TypeVar("THashable", bound=Hashable)
 TIntNone: TypeAlias = int | None
 TNumber: TypeAlias = int | float
 
 
 # --------------------------------------------------------------------------------
-def get_min_permutations(source_list: Iterable[T], target_list: Iterable[T]) -> int:
+def get_min_permutations(
+    source_list: Iterable[THashable], target_list: Iterable[THashable]
+) -> int:
     """
     Подсчитывает минимальное количество перестановок, которое необходимо произвести для того,
     чтобы из исходного списка source_list получить целевой список target_list. При этом порядок
     следования и непрерывность списков не имеют значения.
 
     Args:
-        source_list (Iterable[T]): Исходный список
+        source_list (Iterable[THashable]): Исходный список
 
-        target_list (Iterable[T]): Целевой список
+        target_list (Iterable[THashable]): Целевой список
 
     Returns:
         int: Минимальное количество перестановок
@@ -39,7 +42,9 @@ def get_min_permutations(source_list: Iterable[T], target_list: Iterable[T]) -> 
     """
     # формируем список из номеров позиций для каждого значения из целевого списка.
     # Само значение является ключом.
-    target_index: dict[T, int] = {n: i for i, n in enumerate(target_list)}
+    target_index: dict[THashable, int] = {
+        target_item: idx for idx, target_item in enumerate(target_list)
+    }
     # Генератор, который формирует номер позиции, на которую нужно переставить значение из исходного списка.
     source_index_generator: Generator[int, None, None] = (
         target_index[source_item] for source_item in source_list
@@ -88,15 +93,15 @@ def mult_matrix(
         Количество элементов в списке соответствует количеству строк в матрице.
 
     Example:
-        >>> matrix = [
-            [1.192, 1.192, 2.255, 0.011, 2.167],
-            [1.192, 1.192, 2.255, 0.011, 2.167],
-            [2.255, 2.255, 1.734, 0.109, 5.810],
-            [0.011, 0.011, 0.109, 0.420, 1.081],
-            [2.167, 2.167, 5.810, 1.081, 0.191]
-            ]
-            mult_matrix(matrix, 2,10)
-            [4.887, 4.887, 29.544, 0, 27.283]
+    >>> matrix = [
+        [1.192, 1.192, 2.255, 0.011, 2.167],
+        [1.192, 1.192, 2.255, 0.011, 2.167],
+        [2.255, 2.255, 1.734, 0.109, 5.810],
+        [0.011, 0.011, 0.109, 0.420, 1.081],
+        [2.167, 2.167, 5.810, 1.081, 0.191]
+        ]
+        mult_matrix(matrix, 2,10)
+        [4.887, 4.887, 29.544, 0, 27.283]
 
     """
     # Если минимальное ограничение не задано, задаем как минимальное значение из матрицы
@@ -734,14 +739,14 @@ class MaxSeqLen(NamedTuple):
 
 
 def get_max_sequence_length(
-    sequence: Iterable[Any], symbol: Any, quantity: int
+    sequence: Iterable[TAny], symbol: TAny, quantity: int
 ) -> MaxSeqLen | None:
     """Поиск подпоследовательности максимальной длины, в которой содержится заданное количество
     символов не обязательно стоящих рядом.
 
     Args:
-        sequence (Iterable[Any]): Последовательность символов
-        symbol (Any): Искомый символ
+        sequence (Iterable): Последовательность символов
+        symbol: Искомый символ
         quantity (int): Требуемое количество символов
 
     Returns:
@@ -751,7 +756,7 @@ def get_max_sequence_length(
 
     # Функция-генератор для поиска всех последовательностей с заданным символом и его количеством
     def sequence_length(
-        sequence: Iterable[Any], symbol: Any, quantity: int
+        sequence: Iterable[TAny], symbol: TAny, quantity: int
     ) -> Generator[MaxSeqLen, Any, None]:
         # Очередь для хранения начальных индексов
         # Например для последовательности 'AZBZCZDZEEE' будут сгенерированы индексы: -1, 1, 3, 5, 7, 11
@@ -790,12 +795,12 @@ def get_max_sequence_length(
 
 
 # -------------------------------------------------------------------------------------------------
-def get_max_lenseq_symbol(sequence: Iterable[Any], symbol: Any) -> int:
+def get_max_lenseq_symbol(sequence: Iterable[TAny], symbol: TAny) -> int:
     """Определить длину самой длинной последовательности, состоящей из заданного символа.
 
     Args:
-        sequence (Iterable[Any]): Набор символов.
-        symbol (Any): Искомый символ.
+        sequence (Iterable): Набор символов.
+        symbol: Искомый символ.
 
     Returns:
         int: Длина максимальной последовательности.
