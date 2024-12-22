@@ -730,40 +730,46 @@ def string2number(
     Args:
         data (str): Строка с числами.
         typenum (object): Получаемый тип числа.
-        rounding (bool): Требуется ли арифметическое округление.
+        rounding (bool): Требуется ли арифметическое округление для целых чисел.
         repattern (str): Регулярное выражение для поиска чисел.
+
+    Details:
+        Для извлечения только целых чисел без учета разделителя '.', необходимо задать
+        параметр: repattern = r'[-+]?(?:\d+)'.
 
     Returns:
         Generator([Any, Any, None]): Последовательность чисел заданного типа.
     """
-    # Если в параметрах задано регулярное выражение для поиска чисел, используем его.
-    # Иначе используем выражение по-умолчанию.
-    if repattern:
-        _pattern: str = repattern
-    elif typenum is complex or isinstance(typenum, complex):
-        _num = r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-        # Шаблон для комплексных чисел ищет сочетание с 'j'
-        _pattern = "[-+]?(?:"
-        _pattern += f"{_num}(?:[-+]{_num}[jJ])"
-        _pattern += f"|{_num}(?:[jJ])?"
-        _pattern += ")"
-    else:
-        _pattern = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-    # Компилируем выражение для многократного использования
-    rc: re.Pattern[str] = re.compile(_pattern)
-    # Просматриваем все найденные числа в строке
-    for snum in rc.finditer(data):
-        try:
-            # Для int применимо понятие округления
-            if (typenum is int or isinstance(typenum, int)) and rounding:
-                _num = float(snum[0])
-                _num += -0.5 if _num < 0 else 0.5
-                yield int(_num)
-            # Пытаемся получить число заданного типа
-            elif isinstance(typenum, Callable):
-                yield typenum(snum[0])
-        except Exception:
-            pass
+    if isinstance(typenum, Callable):
+        # Если в параметрах задано регулярное выражение для поиска чисел, используем его.
+        # Иначе используем выражение по-умолчанию.
+        if repattern:
+            _pattern: str = repattern
+        elif typenum is complex or isinstance(typenum, complex):
+            _num = r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+            # Шаблон для комплексных чисел ищет сочетание с 'j'
+            _pattern = "[-+]?(?:"
+            _pattern += f"{_num}(?:[-+]{_num}[jJ])"
+            _pattern += f"|{_num}(?:[jJ])?"
+            _pattern += ")"
+        else:
+            # Шаблон по-умолчанию
+            _pattern = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+        # Компилируем шаблон для многократного использования
+        rc: re.Pattern[str] = re.compile(_pattern)
+        # Просматриваем все найденные числа в строке
+        for snum in rc.finditer(data):
+            try:
+                # Для int применимо понятие округления
+                if (typenum is int or isinstance(typenum, int)) and rounding:
+                    _num = float(snum[0])
+                    _num += -0.5 if _num < 0 else 0.5
+                    yield int(_num)
+                else:
+                    # Пытаемся получить число заданного типа
+                    yield typenum(snum[0])
+            except Exception:
+                pass
 
 
 # -------------------------------------------------------------------------------------------------
