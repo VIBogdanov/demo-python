@@ -130,8 +130,8 @@ class Timers:
         self,
         func: Callable,
         *args: Any,
-        timer: TTimerType = "Total",
-        **kwds: Any,
+        timer: TTimerType = "Call",
+        **kwargs: Any,
     ) -> Any:
         """Вычисляет время выполнения заданной функции с аргументами за N повторов.
         Измеренное время доступно через свойства time_xxxx. Неявно можно передать настроечные
@@ -143,14 +143,14 @@ class Timers:
         В режимах "Total", "Best" и "Average" параметр is_accumulate игнорируется.
 
         Examples:
-            instance(func, *args, **kwds, timer='Best', repeat=100)
-            instance(func, *args, **kwds, time_source=time.process_time, is_show=False)
+            instance(func, *args, **kwargs, timer='Best', repeat=100)
+            instance(func, *args, **kwargs, time_source=time.process_time, is_show=False)
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
             *args (Any): Список позиционных аргументов для вызываемого объекта
-            **kwds (Any): Список именованных аргументов для вызываемого объекта
-            timer (str): Какое время нужно измерит. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Total'
+            **kwargs (Any): Список именованных аргументов для вызываемого объекта
+            timer (str): Какое время нужно измерит. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Call'
             time_source (Callable): Функция, используемая для измерения времени. Default: self.time_source
             repeat (int): Количество повторных запусков вызываемого объекта. Default: self.repeat
             is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: self.is_accumulate
@@ -166,7 +166,7 @@ class Timers:
         """
         # Формируем список параметров, которые передаются в метод __init__.
         # Для каждого из полученных параметров выполняем три шага:
-        # - пытаемся получить значение из входных параметров метода __call__ из kwds
+        # - пытаемся получить значение из входных параметров метода __call__ из kwargs
         # - иначе пытаемся получить значение из атрибута экземпляра класса Timers
         # - иначе подставляем значение по-умолчанию, заданное в методе __init__
         # Если значение по-умолчанию не задано, подставляется пустой object
@@ -174,7 +174,7 @@ class Timers:
         _attrs: dict[str, Any] = dict(
             (
                 arg,
-                kwds.pop(
+                kwargs.pop(
                     arg,
                     getattr(self, arg, False)
                     or getattr(self, "_" + arg, False)
@@ -191,14 +191,14 @@ class Timers:
         _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
         result: Any = None
-        func_signature: str = f"{demo.get_object_modname(func)}({self._get_func_parameters(func, *args, **kwds)})"
+        func_signature: str = f"{demo.get_object_modname(func)}({self._get_func_parameters(func, *args, **kwargs)})"
         _time: float = float("inf")
 
         try:
             match timer:
                 case "Timer" | "Call":
                     _time = _self.time_source()
-                    result = func(*args, **kwds)
+                    result = func(*args, **kwargs)
                     _time = _self.time_source() - _time
                     if _self.is_accumulate:
                         _time += self.__timers.time(timer)
@@ -206,19 +206,19 @@ class Timers:
                     _time = _self.time_source()
                     # itertools.repeat быстрее range
                     for _ in repeat(None, _self.repeat):
-                        result = func(*args, **kwds)
+                        result = func(*args, **kwargs)
                     _time = _self.time_source() - _time
                     if timer == "Average":
                         _time = _time / _self.repeat
                 case "Best":
                     for _ in repeat(None, _self.repeat):
                         _elapsed_time: float = _self.time_source()
-                        result = func(*args, **kwds)
+                        result = func(*args, **kwargs)
                         _elapsed_time = _self.time_source() - _elapsed_time
                         if _elapsed_time < _time:
                             _time = _elapsed_time
                 case _:
-                    return func(*args, **kwds)
+                    return func(*args, **kwargs)
         except Exception as exc:
             raise TimerCallError(f"Call error {func_signature}") from exc
         else:
@@ -458,7 +458,6 @@ class Timers:
             self.__is_show = bool(value)
         except (TypeError, ValueError) as exc:
             raise TimerTypeError("Value 'is_show' must be bool.") from exc
-        # print(f"is_show type: {self.is_show}")
 
     @property
     def repeat(self) -> int:
@@ -480,13 +479,13 @@ class Timers:
     @logger.setter
     def logger(self, logger: logging.Logger | str) -> None:
         match logger:
-            # Меняем текущий логгер на новый или на самого себя с
-            # измененными настройками
             case logging.Logger():
+                # Меняем текущий логгер на новый или на самого себя с
+                # измененными настройками
                 self.__logger = logger
-            # Создаем новый логгер с заданным именем или перенастраиваем
-            # существующий, добавляя отформатированный вывод на консоль.
             case str():
+                # Создаем новый логгер с заданным именем или перенастраиваем
+                # существующий, добавляя отформатированный вывод на консоль.
                 self.__logger = self._get_logger(logger)
             case _:
                 raise TimerTypeError("Value 'logger' must be logging.Logger or str.")
@@ -537,7 +536,7 @@ class MiniTimers:
         func (Callable): Вызываемый объект для замера времени выполнения. Default: None
         *args (Any): Список позиционных аргументов для вызываемого объекта
         **kwds (Any): Список именованных аргументов для вызываемого объекта
-        timer (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Default: 'Total'
+        timer (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Call'
         time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
         repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
 
@@ -546,14 +545,14 @@ class MiniTimers:
         указанием имени вызываемого объекта и его аргументов.
 
     Returns:
-            Any: Результат, возвращаемый вызываемым объектом.
+        Any: Результат, возвращаемый вызываемым объектом.
     """
 
     def __init__(
         self,
         func: Callable | None = None,
         *args: Any,
-        timer: TTimerType = "Total",
+        timer: TTimerType = "Call",
         time_source: Callable = time.perf_counter,
         repeat: int = 1000,
         **kwds: Any,
@@ -568,14 +567,7 @@ class MiniTimers:
             self(func, *args, **kwds)
 
     def __call__(self, func: Callable, *args: Any, **kwds: Any) -> Any:
-        # С помощью getattr обходим исключения при вызове несуществующих атрибутов классов
-        func_module = (
-            func_module + "."
-            if (func_module := getattr(func, "__module__", ""))
-            and func_module != "__main__"
-            else ""
-        )
-        self.__func_signature = f"{func_module}{getattr(func, '__name__', func)}({Timers._get_func_parameters(func, *args, **kwds)})"
+        self.__func_signature = f"{demo.get_object_modname(func)}({Timers._get_func_parameters(func, *args, **kwds)})"
 
         match self.timer:
             case "Timer" | "Call":
@@ -592,7 +584,10 @@ class MiniTimers:
             case "Best":
                 self.__best_time(func, args, kwds)
             case _:
-                return None
+                try:
+                    return func(*args, **kwds)
+                except Exception as exc:
+                    raise RuntimeError(f"Call error {self.__func_signature}") from exc
 
         return self.result
 
@@ -663,7 +658,6 @@ class MiniTimers:
 if __name__ == "__main__":
     tmr = Timers()
 
-    # @tmr.wrapper
     def countdown(n, t=0):
         while n > 0:
             n -= 1
@@ -673,9 +667,5 @@ if __name__ == "__main__":
 
     # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    tmr(countdown, 50000, repeat=100, timer="Best")
-
-    # import demo
-    # tmr(demo.is_int, 10, repeat=100, timer="Best")
-    print(repr(tmr))
+    # tmr(countdown, 50000, repeat=100, timer="Best")
     pass

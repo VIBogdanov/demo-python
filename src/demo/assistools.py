@@ -10,7 +10,7 @@ from collections import Counter, OrderedDict, deque
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence, Sized
 from typing import Any, Self, TypeVar
 
-from demo.timers import MiniTimers
+from demo.timers import MiniTimers  # noqa: F401
 
 CPU_FREQUENCY = 4000  # Считаем, что частота процессора 4000
 
@@ -796,10 +796,21 @@ def main():
         f" unpack_fast(0, 1, range(2,5), [(5, 6), 7, (8, 9)]) -> {list(unpack_fast(0, 1, range(2,5), [(5, 6), 7, (8, 9)]))}"
     )
 
+    print("\n- Извлекает из строки числа и конвертирует их в заданный числовой тип.")
+    print(
+        f" string2number('aaa-23.5bbb+56ccc-67+89jddd') -> {list(string2number('aaa-23.5bbb+56ccc-67+89jddd'))}"
+    )
+    print(
+        f" string2number('aaa-23.5bbb+56ccc-67+89jddd', typenum=float) -> {list(string2number('aaa-23.5bbb+56ccc-67+89jddd', typenum=float))}"
+    )
+    print(
+        f" string2number('aaa-23.5bbb+56ccc-67+89jddd', typenum=complex) -> {list(string2number('aaa-23.5bbb+56ccc-67+89jddd', typenum=complex))}"
+    )
+
 
 # -------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
-    data = range(100_000_000)
-    print(MiniTimers(is_sorted, data, timer="Best", repeat=10))
+    # data = range(100_000_000)
+    # print(MiniTimers(is_sorted, data, timer="Best", repeat=10))
 
     main()
