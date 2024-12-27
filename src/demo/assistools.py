@@ -554,117 +554,62 @@ def inumber_to_digits2(number: Any) -> tuple[int, ...]:
 
 
 # -------------------------------------------------------------------------------------------------
+def is_iterable(obj: object) -> bool:
+    """Проверяет, является ли объект итерируемым.
+    В отличии от isinstance(obj, Iterable), учитывает наличие метода __getitem__ по
+    аналогии с методом iter(), но при этом не вызывает исключения.
 
-
-def unpack_fast(*args: Any) -> Generator[Any, Any, None]:
-    """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
-    вложенности в плоский список.
-
-    Данная версия работает быстро, но потребляет память пропорционально количеству
-    переданных данных. В худшем случае в очереди хранятся все распакованные объекты.
+    Args:
+        obj (object): Проверяемый объект.
 
     Returns:
-        Generator[Any, Any, None]: Генерирует распакованные объекты.
+        bool: True - если объект возможно итерировать.
     """
-    # Загружаем в очередь все полученные функцией объекты
-    args_buff: deque[Any] = deque(args)
-    while args_buff:
-        arg = args_buff.popleft()
-        # Если это итерируемый объект (но не строка)
-        if isinstance(arg, Iterable) and not isinstance(arg, (str, bytes)):
-            # Распаковываем и помещаем в начало очереди
-            args_buff.extendleft(reversed(tuple(arg)))
-        else:
-            # Отдаем не итерируемый объект
-            yield arg
+    checkable_metods = ("__iter__", "__getitem__")
+    return any(hasattr(obj, metod) for metod in checkable_metods)
+
+
+def is_iterable_not_str(obj: object) -> bool:
+    return is_iterable(obj) and not isinstance(obj, (str, bytes))
 
 
 # -------------------------------------------------------------------------------------------------
-def unpack_small(*args: Any) -> Generator[Any, Any, None]:
+def unpack2flat(*args: Any) -> Iterator[Any]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
-    вложенности в плоский список.
-
-    Данная версия работает немного медленнее В очереди хранятся либо итераторы, либо
-    распакованные объекты, которые необходимо отдать позже. Распакованные объекты
-    хранятся частично, а итераторы имеют фиксированные размер.
+    вложенности в плоский список. Потребляет минимум памяти. В очереди хранятся только
+    итераторы.
 
     Returns:
-        Generator[Any, Any, None]: Генерирует распакованные объекты.
+        Iterator[Any]: Генерирует распакованные объекты.
     """
-    iters_buff: deque[Any] = deque()
-    # Т.к. args - это кортеж, делаем из него итератор и помещаем в очередь
-    iters_buff.append(iter(args))
+    # Строки и байты не считаем за итерируемые объекты
+    _not_iterable = (str, bytes)
+    # Т.к. args - это кортеж, делаем из него итератор и инициализируем список
+    iters_buff = [iter(args)]
     while iters_buff:
-        match obj := iters_buff.popleft():
-            case Iterable() if not isinstance(obj, (str, bytes)):
-                i = 0
-                # Разбираем итерируемый объект
-                for _obj in obj:
-                    if isinstance(_obj, Iterable) and not isinstance(
-                        _obj, (str, bytes)
-                    ):
-                        # Внутри может оказаться еще один итерируемый объект
-                        iters_buff.insert(i, iter(_obj))
-                        i += 1
-                    elif i:  # Если i>0
-                        # Иначе сохраняем не итерируемый объект на своем порядковом месте
-                        # Когда до него дойдет очередь, отдадим в блоке 'case _:'
-                        iters_buff.insert(i, _obj)
-                        i += 1
-                    else:  # Если i=0
-                        # Если не итерируемый объект первый в списке, отдаем без сохранения
-                        yield (_obj)
-            case _:
+        # В последней позиции хранится распаковываемый в данный момент объект
+        for obj in iters_buff[-1]:
+            # Если это вложенный итерируемый объект (но не строка)
+            if not isinstance(obj, _not_iterable) and (
+                # Iterable проверяет наличие только метода "__iter__"
+                isinstance(obj, Iterable) or hasattr(obj, "__getitem__")
+            ):
+                # Создаем новый итератор для вложенного объекта.
+                iters_buff.append(iter(obj))
+                # Выходим из цикла for, чтобы обновить ссылку на iters_buff[-1]
+                break
+            else:
                 # Отдаем не итерируемый объект
                 yield obj
+        else:
+            # Как только текущий итератор потреблен, удаляем его из списка и возвращаемся к предыдущему
+            iters_buff.pop()
 
 
 # -------------------------------------------------------------------------------------------------
-
-
-def unpack_least(*args: Any) -> Generator[Any, Any, None]:
-    """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
-    вложенности в плоский список.
-
-    Самая медленная версия, но при этом потребление памяти минмимально. В очереди
-    хранятся исключительно id обрабатываемых объектов - целочисленные значения.
-
-    Returns:
-        Generator[Any, Any, None]: Генерирует распакованные объекты.
-    """
-    iters_buff: deque[int] = deque()
-    # Работаем только с id объектов
-    iters_buff.append(id(args))
-    while iters_buff:
-        # Получаем по id содержимое объекта
-        match arg := ctypes.cast(iters_buff.popleft(), ctypes.py_object).value:
-            # Если это итерируемый объект (но не строка)
-            case Iterable() if not isinstance(arg, (str, bytes)):
-                # Распаковываем объект, при этом индексируем
-                i = 0
-                for _arg in arg:
-                    # Внутри может оказаться еще один итерируемый объект
-                    # Либо сохраняем не итерируемый объект на своем порядковом месте
-                    if (
-                        isinstance(_arg, Iterable)
-                        and not isinstance(_arg, (str, bytes))
-                    ) or i > 0:
-                        iters_buff.insert(i, id(_arg))
-                        i += 1
-                    else:  # Если i=0
-                        # Если не итерируемый объект первый в списке, отдаем без сохранения
-                        yield (_arg)
-            case _:
-                # Отдаем не итерируемый объект
-                yield arg
-
-
-# -------------------------------------------------------------------------------------------------
-
-
 def get_qty_elements_cross(
-    data: Iterable, qty: int, *, offset: int = 1
-) -> Generator[Any, Any, None]:
+    data: Iterable[T], qty: int, *, offset: int = 1
+) -> Iterator[tuple[T, ...]]:
     """Последовательно выбирает заданное количество значений из списка данных. При этом диапазона выбранных
     значений накладываются друг на друга. Например: (0, 1, 2) (1, 2, 3) (2, 3, 4) (3, 4, 5)...
 
@@ -674,12 +619,12 @@ def get_qty_elements_cross(
         3. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
 
     Args:
-        data (Iterable): Список данных.
-        qty (Iterable): Количество отбираемых значений.
-        offset (Iterable): Смещение между значениями.
+        data (Iterable[T]): Список данных.
+        qty (int): Количество отбираемых значений.
+        offset (int): Смещение между значениями.
 
     Returns:
-        Generator[Any, Any, None]: Последовательность кортежей с заданным количеством значений.
+        Iterator[tuple[T, ...]]: Последовательность кортежей с заданным количеством значений.
     """
     # Количество итераторов, равное количеству отбираемых значений, с заданным смещением
     iters = (itertools.islice(data, i * abs(offset), None) for i in range(qty))
@@ -691,23 +636,26 @@ def get_qty_elements_cross(
 
 
 def get_qty_elements_uncross(
-    data: Iterable, qty: int, *, offset: int = 1
-) -> Generator[Any, Any, None]:
+    data: Iterable[T], qty: int, *, offset: int = 1
+) -> Iterator[tuple[T, ...]]:
     """Последовательно выбирает заданное количество значений из списка данных. При этом диапазона выбранных
     значений не пересекаются. Например: (0, 1, 2) (3, 4, 5) (6, 7, 8) (9, 10, 11)...
 
     Example:
-        1. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2) -> (0, 1) (2, 3) (4, 5)
-        2. get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, offset=2) -> (0, 2) (4, 6)
-        3. get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, offset=0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
+        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2)
+        # (0, 1) (2, 3) (4, 5)
+        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, offset=2)
+        # (0, 2) (4, 6)
+        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, offset=0)
+        # (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
 
     Args:
-        data (Iterable): Список данных.
-        qty (Iterable): Количество отбираемых значений.
-        offset (Iterable): Смещение между значениями.
+        data (Iterable[T]): Список данных.
+        qty (int): Количество отбираемых значений.
+        offset (int): Смещение между значениями.
 
     Returns:
-        Generator([Any, Any, None]): Последовательность кортежей с заданным количеством значений.
+        Iterator[tuple[T, ...]]: Последовательность кортежей с заданным количеством значений.
     """
     # Базовый итератор с заданным смещением
     _data = itertools.islice(data, 0, None, abs(offset)) if offset else data
@@ -724,7 +672,7 @@ def string2number(
     typenum: object = int,
     rounding: bool = True,
     repattern: str = "",
-) -> Generator[Any, Any, None]:
+) -> Iterator[object]:
     """Функция-генератор извлекает из строки числа и конвертирует их в заданный числовой тип.
 
     Args:
@@ -735,10 +683,10 @@ def string2number(
 
     Details:
         Для извлечения только целых чисел без учета разделителя '.', необходимо задать
-        параметр: repattern = r'[-+]?(?:\d+)'.
+        параметр: repattern = '[-+]?(?:\\d+)'.
 
     Returns:
-        Generator([Any, Any, None]): Последовательность чисел заданного типа.
+        Iterator[object]: Последовательность чисел заданного типа.
     """
     if isinstance(typenum, Callable):
         # Если в параметрах задано регулярное выражение для поиска чисел, используем его.
@@ -793,7 +741,7 @@ def main():
         "\n- Распаковывает наборы данных с любым уровнем вложенности в плоский список."
     )
     print(
-        f" unpack_fast(0, 1, range(2,5), [(5, 6), 7, (8, 9)]) -> {list(unpack_fast(0, 1, range(2,5), [(5, 6), 7, (8, 9)]))}"
+        f" unpack2flat(0, 1, range(2,5), [(5, 6), 7, (8, 9)]) -> {list(unpack2flat(0, 1, range(2,5), [(5, 6), 7, (8, 9)]))}"
     )
 
     print("\n- Извлекает из строки числа и конвертирует их в заданный числовой тип.")

@@ -594,8 +594,8 @@ class MiniTimers:
     def __repr__(self) -> str:
         return "".join(
             (
-                f"{type(self).__name__}",
-                "(func, *args, **kwds",
+                f"{type(self).__name__}(",
+                "func, *args, **kwargs",
                 f", timer={self.timer!r}",
                 f", time_source={demo.get_object_modname(self.time_source)}",
                 f", repeat={self.repeat!r}",
