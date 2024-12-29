@@ -573,16 +573,28 @@ def is_iterable_not_str(obj: object) -> bool:
 
 
 # -------------------------------------------------------------------------------------------------
-def unpack2flat(*args: Any) -> Iterator[Any]:
+def unpack2flat(
+    *args: Any, not_unpack: object | Iterable[object] = ...
+) -> Iterator[Any]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
     вложенности в плоский список. Потребляет минимум памяти. В очереди хранятся только
     итераторы.
+
+    Args:
+        args: Данные.
+        not_unpack: Типы данных, которые не нужно распаковывать.
 
     Returns:
         Iterator[Any]: Генерирует распакованные объекты.
     """
     # Строки и байты не считаем за итерируемые объекты
-    DO_NOT_ITERATE = (str, bytes)
+    _not_unpack = [str, bytes]
+    if isinstance(not_unpack, Iterable):
+        _not_unpack.extend(not_unpack)
+    elif not_unpack is not ...:
+        _not_unpack.append(not_unpack)
+    DO_NOT_ITERATE = tuple(_not_unpack)
+
     # Т.к. args - это кортеж, делаем из него итератор и инициализируем очередь
     iters_buff = [iter(args)]
     while iters_buff:
