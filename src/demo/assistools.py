@@ -496,16 +496,16 @@ def rinda_multiplication(a: int, b: int) -> int:
 def inumber_to_digits(number: Any) -> Iterator[int]:
     """Функция преобразования целого числа в список цифр.
 
-    Example:
-        1. inumber_to_digits(7362) -> [7, 3, 6, 2]
-        2. inumber_to_digits(7362.7) -> [7, 3, 6, 2]
-        3. inumber_to_digits('number') -> []
-
     Args:
         number (Any): Заданное целое число.
 
     Returns:
         Iterator[int]: Список цифр.
+
+    Example:
+        >>> inumber_to_digits(7362) -> [7, 3, 6, 2]
+        >>> inumber_to_digits(7362.7) -> [7, 3, 6, 2]
+        >>> inumber_to_digits('number') -> []
     """
     try:
         number = int(number)
@@ -586,6 +586,14 @@ def unpack2flat(
 
     Returns:
         Iterator[Any]: Генерирует распакованные объекты.
+
+    Example:
+        >>> list(unpack2flat2(0, 1, range(2, 5), [(5, 6), 7, (8, 9)]))
+        # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        >>> list(unpack2flat2(0, 1, range(2, 5), [(5, 6), 7, (8, 9)], not_unpack = tuple))
+        # [0, 1, 2, 3, 4, (5, 6), 7, (8, 9)]
+        >>> list(unpack2flat2(0, 1, range(2, 5), [(5, 6), 7, (8, 9)], not_unpack = (tuple, list)))
+        # [0, 1, 2, 3, 4, [(5, 6), 7, (8, 9)]]
     """
     # Строки и байты не считаем за итерируемые объекты
     _not_unpack = [str, bytes]
@@ -625,11 +633,6 @@ def get_qty_elements_cross(
     """Последовательно выбирает заданное количество значений из списка данных. При этом диапазона выбранных
     значений накладываются друг на друга. Например: (0, 1, 2) (1, 2, 3) (2, 3, 4) (3, 4, 5)...
 
-    Example:
-        1. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2) -> (0, 1) (1, 2) (2, 3) (3, 4) (4, 5)
-        2. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=2) -> (0, 2) (1, 3) (2, 4) (3, 5)
-        3. get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=0) -> (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
-
     Args:
         data (Iterable[T]): Список данных.
         qty (int): Количество отбираемых значений.
@@ -637,6 +640,14 @@ def get_qty_elements_cross(
 
     Returns:
         Iterator[tuple[T, ...]]: Последовательность кортежей с заданным количеством значений.
+
+    Example:
+        >>> get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2)
+        # (0, 1) (1, 2) (2, 3) (3, 4) (4, 5)
+        >>> get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=2)
+        # (0, 2) (1, 3) (2, 4) (3, 5)
+        >>> get_qty_elements_cross([0, 1, 2, 3, 4, 5], 2, offset=0)
+        # (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
     """
     # Количество итераторов, равное количеству отбираемых значений, с заданным смещением
     iters = (itertools.islice(data, i * abs(offset), None) for i in range(qty))
@@ -653,14 +664,6 @@ def get_qty_elements_uncross(
     """Последовательно выбирает заданное количество значений из списка данных. При этом диапазона выбранных
     значений не пересекаются. Например: (0, 1, 2) (3, 4, 5) (6, 7, 8) (9, 10, 11)...
 
-    Example:
-        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2)
-        # (0, 1) (2, 3) (4, 5)
-        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, offset=2)
-        # (0, 2) (4, 6)
-        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, offset=0)
-        # (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
-
     Args:
         data (Iterable[T]): Список данных.
         qty (int): Количество отбираемых значений.
@@ -668,6 +671,14 @@ def get_qty_elements_uncross(
 
     Returns:
         Iterator[tuple[T, ...]]: Последовательность кортежей с заданным количеством значений.
+
+    Example:
+        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2)
+        # (0, 1) (2, 3) (4, 5)
+        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5, 6], 2, offset=2)
+        # (0, 2) (4, 6)
+        >>> get_qty_elements_uncross([0, 1, 2, 3, 4, 5], 2, offset=0)
+        # (0, 0) (1, 1) (2, 2) (3, 3) (4, 4) (5, 5)
     """
     # Базовый итератор с заданным смещением
     _data = itertools.islice(data, 0, None, abs(offset)) if offset else data
@@ -687,15 +698,15 @@ def string2number(
 ) -> Iterator[object]:
     """Функция-генератор извлекает из строки числа и конвертирует их в заданный числовой тип.
 
+    Details:
+        Для извлечения только целых чисел без учета разделителя '.', необходимо задать
+        параметр: repattern = '[-+]?(?:\\d+)'.
+
     Args:
         data (str): Строка с числами.
         typenum (object): Получаемый тип числа.
         rounding (bool): Требуется ли арифметическое округление для целых чисел.
         repattern (str): Регулярное выражение для поиска чисел.
-
-    Details:
-        Для извлечения только целых чисел без учета разделителя '.', необходимо задать
-        параметр: repattern = '[-+]?(?:\\d+)'.
 
     Returns:
         Iterator[object]: Последовательность чисел заданного типа.
