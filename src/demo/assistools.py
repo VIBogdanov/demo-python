@@ -591,8 +591,8 @@ def unpack2flat(
     *args: Any, not_unpack: object | Iterable[object] = ...
 ) -> Iterator[Any]:
     """Распаковывает наборы данных (списки, словари, генераторы и т.п.) с любым уровнем
-    вложенности в плоский список. Потребляет минимум памяти. В очереди хранятся только
-    итераторы.
+    вложенности в плоский список. Потребляет минимум памяти. Без рекурсии. В очереди
+    хранятся только итераторы.
 
     Args:
         args: Данные.
@@ -608,13 +608,22 @@ def unpack2flat(
         # [0, 1, 2, 3, 4, (5, 6), 7, (8, 9)]
         >>> list(unpack2flat2(0, 1, range(2, 5), [(5, 6), 7, (8, 9)], not_unpack = (tuple, list)))
         # [0, 1, 2, 3, 4, [(5, 6), 7, (8, 9)]]
+        >>> list(unpack2flat2(0, 1, range(2, 5), [(5, 6), 7, (8, 9)], not_unpack = 'tuple list'))
+        # [0, 1, 2, 3, 4, [(5, 6), 7, (8, 9)]]
     """
     # Строки и байты не считаем за итерируемые объекты
     _not_unpack = [str, bytes]
-    if isinstance(not_unpack, Iterable):
-        _not_unpack.extend(not_unpack)
-    elif not_unpack is not ...:
-        _not_unpack.append(not_unpack)
+    match not_unpack:
+        case str():
+            for _obj_name in re.split(r"\W+", not_unpack):
+                if _obj := globals().get(
+                    _obj_name, getattr(__builtins__, _obj_name, None)
+                ):
+                    _not_unpack.append(_obj)
+        case Iterable():
+            _not_unpack.extend(not_unpack)
+        case _ if not_unpack is not ...:
+            _not_unpack.append(not_unpack)
     DO_NOT_ITERATE = tuple(_not_unpack)
 
     # Т.к. args - это кортеж, делаем из него итератор и инициализируем очередь
