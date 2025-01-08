@@ -582,6 +582,7 @@ def is_iterable(obj: object) -> bool:
     return any(hasattr(obj, metod) for metod in checkable_metods)
 
 
+# -------------------------------------------------------------------------------------------------
 def is_iterable_not_str(obj: object) -> bool:
     return is_iterable(obj) and not isinstance(obj, (str, bytes))
 

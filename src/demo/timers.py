@@ -7,7 +7,7 @@ import sys
 import time
 from collections.abc import Callable, Generator
 from itertools import repeat
-from typing import Any, Literal, Self, TypeAlias
+from typing import Any, Literal, Self, TypeAlias, cast
 
 import demo
 
@@ -41,6 +41,82 @@ class TimerNotStopError(TimersErrors):
 
 class TimerTypeError(TimersErrors):
     pass
+
+
+class _TimerLogger:
+    """Private class-descriptor for Timer class"""
+
+    def __init__(self, name: str = "") -> None:
+        # Можно задать собственное имя атрибута, если требуется
+        # Очищаем имя атрибута от начальных и конечных пробелов
+        self.attr_name: str = name.strip()
+
+    def __set_name__(self, owner, name) -> None:
+        # Если при инициализации имя не задано, устанавливаем имя атрибута управляемого класса
+        if not self.attr_name or self.attr_name == name:
+            self.attr_name = "_" + name
+
+    def __set__(self, instance, value: TLogger) -> None:
+        match value:
+            case logging.Logger():
+                # Меняем текущий логгер на новый или на самого себя с
+                # измененными настройками
+                setattr(instance, self.attr_name, value)
+            case str():
+                # Создаем новый логгер с заданным именем или перенастраиваем
+                # существующий, добавляя отформатированный вывод на консоль.
+                setattr(instance, self.attr_name, self._get_logger(value))
+            case None:
+                # Если logger не задан, создаем дефолтовый для класса Timers
+                setattr(
+                    instance, self.attr_name, self._get_logger(type(instance).__name__)
+                )
+            case _:
+                raise TimerTypeError(
+                    f"Value for '{self.attr_name}' must be logging.Logger or str."
+                )
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        if (_logger := getattr(instance, self.attr_name, None)) is None:
+            _logger = self._get_logger(type(instance).__name__)
+        return _logger
+
+    @staticmethod
+    def _get_logger(logger_name: str) -> logging.Logger:
+        """Создает логгер для класса Timers(), который осуществляет
+        отформатированный вывод на консоль.
+
+        Args:
+            logger_name (str): Имя логгера.
+
+        Returns:
+            TLogger: Объект логгера.
+        """
+        logger: logging.Logger = logging.getLogger(logger_name)
+        # Если текущего уровня надостаточно для сообщений типа INFO
+        if logger.getEffectiveLevel() > logging.INFO:
+            logger.setLevel(logging.INFO)
+        # Формируем уникальное имя handler-ра для конкретного логгера
+        handler_name: str = f"_{logger_name}__{id(logger)}"
+        # Предотвращаем дублирование handler-ра
+        if handler_name not in set(
+            handler.name for handler in logger.handlers if handler.name is not None
+        ):
+            formatter = logging.Formatter(
+                "{asctime} {name} [{levelname}]: {message}",
+                datefmt="%d-%m-%Y %H:%M:%S",
+                style="{",
+            )
+            # Перенаправляем весь вывод на консоль
+            handler = logging.StreamHandler(stream=sys.stdout)
+            handler.set_name(handler_name)
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
+        return logger
 
 
 @dataclasses.dataclass(slots=True)
@@ -106,6 +182,9 @@ class Timers:
         logger (Logger | str | None): Вывод результатов замеров. По-умолчанию на консоль. Default: None
     """
 
+    # Дескриптор для атрибута logger
+    logger = _TimerLogger()
+
     def __init__(
         self,
         time_source: Callable = time.perf_counter,
@@ -119,8 +198,7 @@ class Timers:
         self.is_accumulate = is_accumulate
         self.is_show = is_show
         self.repeat = repeat
-        # Если logger не задан, создаем дефолтовый для класса Timers
-        self.logger = logger if logger is not None else type(self).__name__
+        self.logger = logger
         # Класс-хранилище всех измеряемых показателей времени
         self.__timers: _TimersTime = _TimersTime()
         # None - счетчик не запущен
@@ -337,41 +415,6 @@ class Timers:
             _str = ""
         return _str
 
-    @staticmethod
-    def _get_logger(logger_name: str) -> logging.Logger:
-        """Создает логгер для класса Timers(), который осуществляет
-        отформатированный вывод на консоль.
-
-        Args:
-            logger_name (str): Имя логгера.
-
-        Returns:
-            TLogger: Объект логгера.
-        """
-        logger: logging.Logger = logging.getLogger(logger_name)
-        # Если текущего уровня надостаточно для сообщений типа INFO
-        if logger.getEffectiveLevel() > logging.INFO:
-            logger.setLevel(logging.INFO)
-        # Формируем уникальное имя handler-ра для конкретного логгера
-        handler_name: str = f"_{logger_name}__{id(logger)}"
-        # Предотвращаем дублирование handler-ра
-        if handler_name not in set(
-            handler.name for handler in logger.handlers if handler.name is not None
-        ):
-            formatter = logging.Formatter(
-                "{asctime} {name} [{levelname}]: {message}",
-                datefmt="%d-%m-%Y %H:%M:%S",
-                style="{",
-            )
-            # Перенаправляем весь вывод на консоль
-            handler = logging.StreamHandler(stream=sys.stdout)
-            handler.set_name(handler_name)
-            handler.setLevel(logging.INFO)
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-
-        return logger
-
     def start(self) -> None:
         """Запускает таймер."""
         # Если таймер уже был запущен
@@ -404,7 +447,9 @@ class Timers:
             self.__timers.save(_timer, _time, _log)
 
             if self.is_show:
-                self.logger.info(_log)
+                # cast нужен исключительно для успокоения статического анализатора типов
+                _logger = cast(logging.Logger, self.logger)
+                _logger.info(_log)
 
         return self.time_timer
 
@@ -467,28 +512,9 @@ class Timers:
     @repeat.setter
     def repeat(self, value: TRepeat) -> None:
         try:
-            self.__repeat = int(value)
+            self.__repeat = abs(int(value))
         except (TypeError, ValueError) as exc:
             raise TimerTypeError("Value 'repeat' must be int.") from exc
-
-    @property
-    def logger(self) -> logging.Logger:
-        """Текущий логгер для вывода измерений времени."""
-        return self.__logger
-
-    @logger.setter
-    def logger(self, logger: logging.Logger | str) -> None:
-        match logger:
-            case logging.Logger():
-                # Меняем текущий логгер на новый или на самого себя с
-                # измененными настройками
-                self.__logger = logger
-            case str():
-                # Создаем новый логгер с заданным именем или перенастраиваем
-                # существующий, добавляя отформатированный вывод на консоль.
-                self.__logger = self._get_logger(logger)
-            case _:
-                raise TimerTypeError("Value 'logger' must be logging.Logger or str.")
 
     @property
     def is_running(self) -> bool:
