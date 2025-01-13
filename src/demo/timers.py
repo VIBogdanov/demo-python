@@ -5,6 +5,7 @@ import inspect
 import logging
 import sys
 import time
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from itertools import repeat
 from typing import Any, Literal, Self, TypeAlias, cast
@@ -43,45 +44,103 @@ class TimerTypeError(TimersErrors):
     pass
 
 
-class _TimerLogger:
-    """Private class-descriptor for Timer class"""
-
-    def __init__(self, name: str = "") -> None:
+class _TimerTypeChecker(ABC):
+    def __init__(self, attr_name: str = "") -> None:
+        super().__init__()
         # Можно задать собственное имя атрибута, если требуется
         # Очищаем имя атрибута от начальных и конечных пробелов
-        self.attr_name: str = name.strip()
+        self._attr_name: str = attr_name.strip()
 
-    def __set_name__(self, owner, name) -> None:
+    def __set_name__(self, owner, attr_name: str) -> None:
         # Если при инициализации имя не задано, устанавливаем имя атрибута управляемого класса
-        if not self.attr_name or self.attr_name == name:
-            self.attr_name = "_" + name
+        if not self._attr_name or self._attr_name == attr_name:
+            # Добавляем подчеркивание, дабы методы setattr и getattr не зацикливались
+            self._attr_name = f"_{attr_name}"
+
+    def __set__(self, instance, value: Any) -> None:
+        value = self.type_check(self._attr_name, value)
+        setattr(instance, self._attr_name, value)
+
+    def __get__(self, instance, owner=None) -> Any:
+        # Если атрибут вызван из класса, возвращаем класс-дескриптор
+        if instance is None:
+            return self
+
+        return getattr(instance, self._attr_name)
+
+    @abstractmethod
+    def type_check(self, attr_name: str, value: Any) -> Any:
+        """Проверить и вернуть значение или возбудить исключение TimerTypeError"""
+
+
+class TypeBool(_TimerTypeChecker):
+    def type_check(self, attr_name: str, value: Any) -> bool:
+        if not isinstance(value, bool):
+            raise TimerTypeError(f"Value '{attr_name}' must be bool.")
+
+        return value
+
+
+class TypePosInteger(_TimerTypeChecker):
+    def type_check(self, attr_name: str, value: Any) -> int:
+        try:
+            value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise TimerTypeError(f"Value '{attr_name}' must be int.") from exc
+
+        if value <= 0:
+            raise TimerTypeError(f"Value '{attr_name}' must be greater than zero.")
+
+        return value
+
+
+class TypeCallable(_TimerTypeChecker):
+    def type_check(self, attr_name: str, value: Any) -> Any:
+        if not isinstance(value, Callable):
+            raise TimerTypeError(f"Value '{attr_name}' must be Callable.")
+
+        return value
+
+
+class TypeLogger:
+    """Private class-descriptor for Timer class"""
+
+    def __init__(self, attr_name: str = "") -> None:
+        self._attr_name: str = attr_name.strip()
+
+    def __set_name__(self, owner, attr_name: str) -> None:
+        if not self._attr_name or self._attr_name == attr_name:
+            self._attr_name = f"_{attr_name}"
 
     def __set__(self, instance, value: TLogger) -> None:
         match value:
             case logging.Logger():
                 # Меняем текущий логгер на новый или на самого себя с
                 # измененными настройками
-                setattr(instance, self.attr_name, value)
+                setattr(instance, self._attr_name, value)
+                # Альтернатива: instance.__dict__[self._attr_name] = value
+                # Тогда можно обойтись без начального '_' в имени атрибута
             case str():
                 # Создаем новый логгер с заданным именем или перенастраиваем
                 # существующий, добавляя отформатированный вывод на консоль.
-                setattr(instance, self.attr_name, self._get_logger(value))
+                setattr(instance, self._attr_name, self._get_logger(value))
             case None:
                 # Если logger не задан, создаем дефолтовый для класса Timers
                 setattr(
-                    instance, self.attr_name, self._get_logger(type(instance).__name__)
+                    instance, self._attr_name, self._get_logger(type(instance).__name__)
                 )
             case _:
                 raise TimerTypeError(
-                    f"Value for '{self.attr_name}' must be logging.Logger or str."
+                    f"Value for '{self._attr_name}' must be logging.Logger or str."
                 )
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance, owner=None) -> Self | logging.Logger:
         if instance is None:
             return self
-        if (_logger := getattr(instance, self.attr_name, None)) is None:
-            _logger = self._get_logger(type(instance).__name__)
-        return _logger
+        # Если логгер еще не был установлен, возвращаем дефолтовый
+        return getattr(
+            instance, self._attr_name, self._get_logger(type(instance).__name__)
+        )
 
     @staticmethod
     def _get_logger(logger_name: str) -> logging.Logger:
@@ -182,8 +241,12 @@ class Timers:
         logger (Logger | str | None): Вывод результатов замеров. По-умолчанию на консоль. Default: None
     """
 
-    # Дескриптор для атрибута logger
-    logger = _TimerLogger()
+    # Дескрипторы
+    time_source = TypeCallable()
+    is_accumulate = TypeBool()
+    is_show = TypeBool()
+    repeat = TypePosInteger()
+    logger = TypeLogger()
 
     def __init__(
         self,
@@ -236,6 +299,7 @@ class Timers:
             logger (Logger): Вывод результатов замеров в заданный поток. Default: self.logger
 
         Raises:
+            result: Результат выполнения вызываемого объекта func.
             RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
             указанием имени вызываемого объекта и его аргументов.
 
@@ -248,23 +312,26 @@ class Timers:
         # - иначе пытаемся получить значение из атрибута экземпляра класса Timers
         # - иначе подставляем значение по-умолчанию, заданное в методе __init__
         # Если значение по-умолчанию не задано, подставляется пустой object
-        # В итоге будет сформирован словарь из имен параметров и их значений
-        _attrs: dict[str, Any] = dict(
-            (
+        # В итоге будет сформирован словарь из аргументов класса Timers и их значений
+        _attrs: dict[str, Any] = {
+            arg: kwargs.pop(
                 arg,
-                kwargs.pop(
+                getattr(
+                    self,
                     arg,
-                    getattr(self, arg, False)
-                    or getattr(self, "_" + arg, False)
-                    or getattr(
+                    getattr(
                         self,
-                        f"_{type(self).__name__}__{arg}",
-                        val.default if val.default is not val.empty else object(),
+                        "_" + arg,
+                        getattr(
+                            self,
+                            f"_{type(self).__name__}__{arg}",  # Альтернатива:  f"_{self.__class__.__name__}__{arg}"
+                            val.default if val.default is not val.empty else object(),
+                        ),
                     ),
                 ),
             )
             for arg, val in inspect.signature(self.__init__).parameters.items()
-        )
+        }
         # Из полученного словаря формируем именованный кортеж для удобства
         _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
@@ -319,14 +386,20 @@ class Timers:
         get_init_parameters: Generator[tuple[str, Any], None, None] = (
             (
                 attr,  # Параметр: somename
-                # 'or' возвращает первый getattr, который успешен. Иначе _not_defined
-                getattr(self, attr, False)  # Атрибут: self.somename
-                or getattr(self, "_" + attr, False)  # Атрибут: self._somename
-                # Атрибут: self.__somename
-                or getattr(
+                getattr(
                     self,
-                    f"_{_cls}__{attr}",
-                    val.default if val.default is not val.empty else _not_defined,
+                    attr,  # Атрибут: self.somename
+                    getattr(
+                        self,
+                        "_" + attr,  # Атрибут: self._somename
+                        getattr(
+                            self,
+                            f"_{_cls}__{attr}",  # Атрибут: self.__somename
+                            val.default
+                            if val.default is not val.empty
+                            else _not_defined,
+                        ),
+                    ),
                 ),
             )
             for attr, val in inspect.signature(self.__init__).parameters.items()
@@ -364,7 +437,7 @@ class Timers:
 
     def register(self, func: Callable):
         """Позволяет использовать класс как декоратор: @Timers().register. При этом можно задать
-        функцию источник времени и другие параметры для класса Timers.
+        функцию источника времени и другие параметры для класса Timers.
         Допускается использовать один и тот же таймер и как декоратор, и как менеджер контекста и как ручной таймер.
         При этом декоратор может быть вложен в менеджер контента или в ручной таймер.
 
@@ -379,7 +452,9 @@ class Timers:
 
         @functools.wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
-            return self(func, *args, **kwargs, timer="Call")
+            # Если именованный аргумент 'timer' не задан, устанавливаем дефолтовое значение
+            _timer: TTimerType = kwargs.pop("timer", "Call")
+            return self(func, *args, **kwargs, timer=_timer)
 
         return _wrapper
 
@@ -397,18 +472,18 @@ class Timers:
             str: Строка вида 'аргумент = значение, ...'
         """
         func_signature: inspect.Signature = inspect.signature(func)
+        func_parameters = func_signature.parameters.keys()
         # Переупаковываем словарь именованных аргументов, оставляя только те, что заданы
         # в сигнатуре вызываемого объекта, т.к. дополнительно в списке именованных
         # аргументов могут присутствовать аргументы специфичные для класса Timers()
-        _kwargs: Generator[tuple[str, Any], None, None] = (
-            (k, v) for k, v in kwargs.items() if k in func_signature.parameters.keys()
-        )
+        kwargs = {k: v for k, v in kwargs.items() if k in func_parameters}
+
         # Формируем строку аргументов и их значений, переданных в вызываемый объект
         try:
             _str: str = ", ".join(
                 f"{arg_name}={arg_value!r}"
                 for arg_name, arg_value in func_signature.bind(
-                    *args, **dict(_kwargs)
+                    *args, **kwargs
                 ).arguments.items()
             )
         except Exception:
@@ -467,54 +542,6 @@ class Timers:
         """
         self.__timers.reset("Timer")
         self.__start_time = self.time_source()
-
-    @property
-    def time_source(self) -> Callable:
-        """Функция, используемая для измерения времени."""
-        return self.__time_source
-
-    @time_source.setter
-    def time_source(self, func: Callable) -> None:
-        if isinstance(func, Callable):
-            self.__time_source = func
-        else:
-            raise TimerTypeError("Value 'time_source' must be Callable.")
-
-    @property
-    def is_accumulate(self) -> bool:
-        """Флаг, активирующий режим аккумулирования измерений."""
-        return self.__is_accumulate
-
-    @is_accumulate.setter
-    def is_accumulate(self, value: bool) -> None:
-        try:
-            self.__is_accumulate = bool(value)
-        except (TypeError, ValueError) as exc:
-            raise TimerTypeError("Value 'is_accumulate' must be bool.") from exc
-
-    @property
-    def is_show(self) -> bool:
-        """Флаг, разрешающий вывод результатов замера на консоль."""
-        return self.__is_show
-
-    @is_show.setter
-    def is_show(self, value: bool) -> None:
-        try:
-            self.__is_show = bool(value)
-        except (TypeError, ValueError) as exc:
-            raise TimerTypeError("Value 'is_show' must be bool.") from exc
-
-    @property
-    def repeat(self) -> int:
-        """Количество повторных запусков вызываемого объекта."""
-        return self.__repeat
-
-    @repeat.setter
-    def repeat(self, value: TRepeat) -> None:
-        try:
-            self.__repeat = abs(int(value))
-        except (TypeError, ValueError) as exc:
-            raise TimerTypeError("Value 'repeat' must be int.") from exc
 
     @property
     def is_running(self) -> bool:
@@ -693,5 +720,5 @@ if __name__ == "__main__":
 
     # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    # tmr(countdown, 50000, repeat=100, timer="Best")
+    tmr(countdown, 50000, t=10, repeat=100, timer="Best")
     pass
