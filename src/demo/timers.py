@@ -6,7 +6,7 @@ import logging
 import sys
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Iterator
 from itertools import repeat
 from typing import Any, Literal, Self, TypeAlias, cast
 
@@ -55,6 +55,8 @@ class _TimerTypeChecker(ABC):
         # Если при инициализации имя не задано, устанавливаем имя атрибута управляемого класса
         if not self._attr_name or self._attr_name == attr_name:
             # Добавляем подчеркивание, дабы методы setattr и getattr не зацикливались
+            # Альтернатива: использовать instance.__dict__[self._attr_name] вместо setattr и getattr
+            # Тогда можно обойтись без начального '_' в имени атрибута
             self._attr_name = f"_{attr_name}"
 
     def __set__(self, instance, value: Any) -> None:
@@ -76,7 +78,7 @@ class _TimerTypeChecker(ABC):
 class TypeBool(_TimerTypeChecker):
     def type_check(self, attr_name: str, value: Any) -> bool:
         if not isinstance(value, bool):
-            raise TimerTypeError(f"Value '{attr_name}' must be bool.")
+            raise TimerTypeError(f"Value for '{attr_name}' must be bool.")
 
         return value
 
@@ -86,10 +88,10 @@ class TypePosInteger(_TimerTypeChecker):
         try:
             value = int(value)
         except (TypeError, ValueError) as exc:
-            raise TimerTypeError(f"Value '{attr_name}' must be int.") from exc
+            raise TimerTypeError(f"Value for '{attr_name}' must be int.") from exc
 
         if value <= 0:
-            raise TimerTypeError(f"Value '{attr_name}' must be greater than zero.")
+            raise TimerTypeError(f"Value for '{attr_name}' must be greater than zero.")
 
         return value
 
@@ -97,42 +99,17 @@ class TypePosInteger(_TimerTypeChecker):
 class TypeCallable(_TimerTypeChecker):
     def type_check(self, attr_name: str, value: Any) -> Any:
         if not isinstance(value, Callable):
-            raise TimerTypeError(f"Value '{attr_name}' must be Callable.")
+            raise TimerTypeError(f"Value for '{attr_name}' must be Callable.")
 
         return value
 
 
-class TypeLogger:
-    """Private class-descriptor for Timer class"""
-
-    def __init__(self, attr_name: str = "") -> None:
-        self._attr_name: str = attr_name.strip()
-
-    def __set_name__(self, owner, attr_name: str) -> None:
-        if not self._attr_name or self._attr_name == attr_name:
-            self._attr_name = f"_{attr_name}"
-
+class TypeLogger(_TimerTypeChecker):
     def __set__(self, instance, value: TLogger) -> None:
-        match value:
-            case logging.Logger():
-                # Меняем текущий логгер на новый или на самого себя с
-                # измененными настройками
-                setattr(instance, self._attr_name, value)
-                # Альтернатива: instance.__dict__[self._attr_name] = value
-                # Тогда можно обойтись без начального '_' в имени атрибута
-            case str():
-                # Создаем новый логгер с заданным именем или перенастраиваем
-                # существующий, добавляя отформатированный вывод на консоль.
-                setattr(instance, self._attr_name, self._get_logger(value))
-            case None:
-                # Если logger не задан, создаем дефолтовый для класса Timers
-                setattr(
-                    instance, self._attr_name, self._get_logger(type(instance).__name__)
-                )
-            case _:
-                raise TimerTypeError(
-                    f"Value for '{self._attr_name}' must be logging.Logger or str."
-                )
+        # Если logger не задан, создаем дефолтовый для класса Timers
+        super().__set__(
+            instance, value if value is not None else type(instance).__name__
+        )
 
     def __get__(self, instance, owner=None) -> Self | logging.Logger:
         if instance is None:
@@ -141,6 +118,22 @@ class TypeLogger:
         return getattr(
             instance, self._attr_name, self._get_logger(type(instance).__name__)
         )
+
+    def type_check(self, attr_name: str, value: Any) -> logging.Logger:
+        match value:
+            case logging.Logger():
+                # Меняем текущий логгер на новый или на самого себя с
+                # измененными настройками
+                pass
+            case str():
+                # Создаем новый логгер с заданным именем или перенастраиваем
+                # существующий, добавляя отформатированный вывод на консоль.
+                value = self._get_logger(value)
+            case _:
+                raise TimerTypeError(
+                    f"Value for '{attr_name}' must be logging.Logger or str."
+                )
+        return value
 
     @staticmethod
     def _get_logger(logger_name: str) -> logging.Logger:
@@ -307,31 +300,13 @@ class Timers:
             Any: Результат, возвращаемый вызываемым объектом.
         """
         # Формируем список параметров, которые передаются в метод __init__.
-        # Для каждого из полученных параметров выполняем три шага:
+        # Для каждого из параметров выполняем три шага:
         # - пытаемся получить значение из входных параметров метода __call__ из kwargs
         # - иначе пытаемся получить значение из атрибута экземпляра класса Timers
         # - иначе подставляем значение по-умолчанию, заданное в методе __init__
-        # Если значение по-умолчанию не задано, подставляется пустой object
+        # Если значение по-умолчанию не задано, подставляется None
         # В итоге будет сформирован словарь из аргументов класса Timers и их значений
-        _attrs: dict[str, Any] = {
-            arg: kwargs.pop(
-                arg,
-                getattr(
-                    self,
-                    arg,
-                    getattr(
-                        self,
-                        "_" + arg,
-                        getattr(
-                            self,
-                            f"_{type(self).__name__}__{arg}",  # Альтернатива:  f"_{self.__class__.__name__}__{arg}"
-                            val.default if val.default is not val.empty else object(),
-                        ),
-                    ),
-                ),
-            )
-            for arg, val in inspect.signature(self.__init__).parameters.items()
-        }
+        _attrs = {arg: kwargs.pop(arg, val) for arg, val in self._get_init_parameters()}
         # Из полученного словаря формируем именованный кортеж для удобства
         _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
@@ -377,40 +352,18 @@ class Timers:
     def __repr__(self) -> str:
         # На случай, когда не удалось получить значение параметра
         _not_defined = object()
-        _cls: str = type(self).__name__
         # Собираем из списка параметров метода __init__ строку инициализации экземпляра класса
-        # с текущими значениями параметров, а не с переданными в момент инициализации (благодаря генератору)
-        # Генератор формируем каждый раз заново, т.к. генератор одноразовый, а метод __repr__
-        # может быть вызван многократно
+        # с текущими значениями параметров, а не с переданными в момент инициализации.
         # Важно! Имя атрибута должно совпадать с именем параметра кроме начальных подчеркиваний
-        get_init_parameters: Generator[tuple[str, Any], None, None] = (
-            (
-                attr,  # Параметр: somename
-                getattr(
-                    self,
-                    attr,  # Атрибут: self.somename
-                    getattr(
-                        self,
-                        "_" + attr,  # Атрибут: self._somename
-                        getattr(
-                            self,
-                            f"_{_cls}__{attr}",  # Атрибут: self.__somename
-                            val.default
-                            if val.default is not val.empty
-                            else _not_defined,
-                        ),
-                    ),
-                ),
-            )
-            for attr, val in inspect.signature(self.__init__).parameters.items()
-        )
         return "".join(
             (
-                f"{_cls}(",
+                f"{type(self).__name__}(",
                 ", ".join(
                     # Отбираем те параметры, которые удалось идентифицировать
                     f"{attr} = {demo.get_object_modname(value)}"
-                    for attr, value in get_init_parameters
+                    for attr, value in self._get_init_parameters(
+                        empty_value=_not_defined
+                    )
                     if value is not _not_defined
                 ),
                 ")",
@@ -457,6 +410,41 @@ class Timers:
             return self(func, *args, **kwargs, timer=_timer)
 
         return _wrapper
+
+    def _get_init_parameters(
+        self, empty_value: Any = None
+    ) -> Iterator[tuple[str, Any]]:
+        """Формирует итератор параметров и их значений метода __init__ экземпляра класса
+        с текущими значениями параметров, а не с переданными в момент инициализации.
+
+        Args:
+            empty_value: Значение по-умолчанию для параметров не найденных в экземпляре класса. Defaults to None.
+
+        Returns:
+            Iterator[tuple[str, Any]]: Итератор кортежей (параметр, значение)
+        """
+        return (
+            (
+                attr,
+                getattr(
+                    self,
+                    attr,  # Атрибут: self.somename
+                    getattr(
+                        self,
+                        "_" + attr,  # Атрибут: self._somename
+                        getattr(
+                            self,
+                            # Альтернатива:  f"_{self.__class__.__name__}__{arg}"
+                            f"_{type(self).__name__}__{attr}",  # Атрибут: self.__somename
+                            val.default  # Значение переданное в __init__
+                            if val.default is not val.empty
+                            else empty_value,  # Значение-пустышка в случае неудачного поиска
+                        ),
+                    ),
+                ),
+            )
+            for attr, val in inspect.signature(self.__init__).parameters.items()
+        )
 
     @staticmethod
     def _get_func_parameters(func: Callable, *args: Any, **kwargs: Any) -> str:
@@ -720,5 +708,5 @@ if __name__ == "__main__":
 
     # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    tmr(countdown, 50000, t=10, repeat=100, timer="Best")
+    # tmr(countdown, 50000, t=10, repeat=100, timer="Best")
     pass
