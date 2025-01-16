@@ -745,7 +745,7 @@ def string2number(
         # Иначе используем выражение по-умолчанию.
         if repattern:
             _pattern: str = repattern
-        elif typenum is complex or isinstance(typenum, complex):
+        elif isinstance(typenum, (complex, type(complex))):
             _num = r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
             # Шаблон для комплексных чисел ищет сочетание с 'j'
             _pattern = "[-+]?(?:"
@@ -761,7 +761,7 @@ def string2number(
         for snum in rc.finditer(data):
             try:
                 # Для int применимо понятие округления
-                if (typenum is int or isinstance(typenum, int)) and rounding:
+                if (isinstance(typenum, (int, type(int)))) and rounding:
                     _num = float(snum[0])
                     _num += -0.5 if _num < 0 else 0.5
                     yield int(_num)
