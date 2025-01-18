@@ -8,7 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from itertools import repeat
-from typing import Any, Literal, Self, TypeAlias, cast
+from typing import Any, Literal, Self, TypeAlias, cast, get_args
 
 import demo
 
@@ -46,7 +46,9 @@ class TimerTypeError(TimersErrors):
 
 
 class _TimersTypes(ABC):
-    def __init__(self, attr_name: str = "", attr_mode: TAttrMode = "Public") -> None:
+    def __init__(
+        self, attr_name: str = "", attr_mode: TAttrMode = "Public", **kwargs
+    ) -> None:
         """Парметр attr_mode означает следующее:
         - Public - имя атрибута устанавливается равным attr_name без изменений
         - Private - к имени атрибута добавляется префикс '_'
@@ -61,6 +63,10 @@ class _TimersTypes(ABC):
         # Очищаем имя атрибута от начальных и конечных пробелов
         self._attr_name: str = attr_name.strip()
         self._attr_mode: TAttrMode = attr_mode
+        # Сохраняем любые переданные именованные аргументы
+        # В данной реализации этот функционал не используется
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def __set_name__(self, cls_owner, attr_name: str) -> None:
         self._set_name = attr_name
@@ -123,7 +129,7 @@ class PositiveValue(_TimersTypes):
                 )
         except TypeError as exc:
             raise TimerTypeError(
-                f"Value for '{attr_name}' must supported '<=' operator."
+                f"Value for '{attr_name}' must support '<=' operator."
             ) from exc
         return super().type_check(attr_name, value)
 
@@ -230,6 +236,8 @@ class _TimersTime:
         return self.log(self._last_timer)
 
     def reset(self, timer: TTimerType | None = None) -> None:
+        """Удаляет сохраненные время и лог для заданного таймера.
+        Если конкретный таймер не задан (None), удаляет все таймеры."""
         if timer is None:
             # Сбрасываем все счетчики
             self._timers_time.clear()
@@ -240,16 +248,21 @@ class _TimersTime:
             self._timers_log.pop(timer, "")
 
     def save(self, timer: TTimerType, time: float, log: str = "") -> None:
+        """Сохраняет время и лог таймера и регистрирует таймер как последний сохраненный"""
         self._timers_time[timer] = time
         self._timers_log[timer] = log
         self._last_timer = timer
 
     def time(self, timer: TTimerType | None = None) -> float:
+        """Возвращает сохраненное время заданного таймера. Если таймер не задан (None),
+        возвращает время последнего сохраненного таймера"""
         if timer is None:
             timer = self._last_timer
         return self._timers_time.get(timer, 0.0)
 
     def log(self, timer: TTimerType | None = None) -> str:
+        """Возвращает сохраненный текст лога заданного таймера. Если таймер не задан (None),
+        возвращает лог последнего сохраненного таймера"""
         if timer is None:
             timer = self._last_timer
         _str: str = self._timers_log.get(timer, f"{timer} time not measured!")
@@ -268,7 +281,7 @@ class Timers:
     Args:
         time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
         is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: False
-        is_show (bool): Флаг, разрешающий вывод результатов замера на консоль. Default: True
+        is_show (bool): Флаг, разрешающий вывод результатов замера. Default: True
         repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
         logger (Logger | str | None): Вывод результатов замеров. По-умолчанию на консоль. Default: None
     """
@@ -307,7 +320,7 @@ class Timers:
         **kwargs: Any,
     ) -> Any:
         """Вычисляет время выполнения заданной функции с аргументами за N повторов.
-        Измеренное время доступно через свойства time_xxxx. Неявно можно передать настроечные
+        Измеренное время доступно через метод time. Неявно можно передать настроечные
         параметры time_source, repeat, is_accumulate, is_show и logger в виде именованных аргументов,
         иначе будут использованы значения соответствующих свойств экземпляра класса.
         Неявные настроечные параметры действуют единоразово только на момент вызова метода и
@@ -363,7 +376,7 @@ class Timers:
                     result = func(*args, **kwargs)
                     _time = _self.time_source() - _time
                     if _self.is_accumulate:
-                        _time += self.__timers.time(timer)
+                        _time += self.time(timer)
                 case "Total" | "Average":
                     _time = _self.time_source()
                     # itertools.repeat быстрее range
@@ -412,11 +425,11 @@ class Timers:
         )
 
     def __str__(self) -> str:
-        # По-умолчанию выводим лог последнего сохраненного таймера
+        """По-умолчанию возвращает лог последнего сохраненного таймера"""
         return self.__timers.log()
 
     def log(self, timer: TTimerType | None = None) -> str:
-        # Выводим лог заданного таймера или последнего сохраненного
+        """Возвращает лог заданного таймера или последнего сохраненного"""
         return self.__timers.log(timer)
 
     # Для поддержки протокола менеджера контекста, реализованы методы __enter__ и __exit__
@@ -429,6 +442,11 @@ class Timers:
         if self.__start_time is not None:
             self.stop()
 
+    def __getattr__(self, attr_name):
+        if attr_name in get_args(TTimerType):
+            return self.time(attr_name)
+        return super().__getattribute__(attr_name)
+
     def register(self, func: Callable):
         """Позволяет использовать класс как декоратор: @Timers().register. При этом можно задать
         функцию источника времени и другие параметры для класса Timers.
@@ -439,7 +457,8 @@ class Timers:
 
         >>> @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).register
         Альтернатива, предварительно создать экземпляр класса Timers, настроить необходимые параметры и
-        использовать экземпляр как декоратор: @instance.register.
+        использовать экземпляр как декоратор:
+        >>> @instance.register.
 
         Параметр repeat для декоратора не используется и игнорируется.
         """
@@ -555,7 +574,7 @@ class Timers:
                 _logger = cast(logging.Logger, self.logger)
                 _logger.info(_log)
 
-        return self.time_timer
+        return self.time(_timer)
 
     def reset(self, timer: TTimerType | None = None) -> None:
         """Обнуляет заданный счетчик времени, либо все счетчики если timer=None.
@@ -578,35 +597,20 @@ class Timers:
         return self.__start_time is not None
 
     def time(self, timer: TTimerType | None = None) -> float:
-        """Возвращает время заданного таймера или по-умолчанию последнего сохраненного"""
+        """Возвращает время заданного таймера или по-умолчанию последнего сохраненного
+        Поддерживается вызов таймера в качестве атрибута экземпляра класса.
+
+        Например:
+        >>> instance.Timer
+        >>> instance.Call
+        >>> instance.Total
+        >>> instance.Best
+        >>> instance.Average
+
+        что приведет к вызову метода instance.time() с заданным таймером (см. __getattr__)."""
         if timer == "Timer" and self.is_running:
             raise TimerNotStopError
         return self.__timers.time(timer)
-
-    @property
-    def time_timer(self) -> float:
-        """Время между start() и stop()"""
-        return self.time("Timer")
-
-    @property
-    def time_call(self) -> float:
-        """Время, измеренное декоратором или прямым выполнением вызываемого объекта"""
-        return self.time("Call")
-
-    @property
-    def time_total(self) -> float:
-        """Суммарное время выполнения вызываемого объекта за N повторов"""
-        return self.time("Total")
-
-    @property
-    def time_best(self) -> float:
-        """Лучшее время выполнения вызываемого объекта за N повторов"""
-        return self.time("Best")
-
-    @property
-    def time_average(self) -> float:
-        """Среднее время выполнения вызываемого объекта за N повторов"""
-        return self.time("Average")
 
 
 class MiniTimers:
@@ -750,4 +754,5 @@ if __name__ == "__main__":
     # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
     tmr(countdown, 50000, t=10, repeat=10, timer="Best")
+
     pass
