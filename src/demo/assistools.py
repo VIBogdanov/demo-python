@@ -35,7 +35,7 @@ def get_object_name(obj: object) -> str:
     """Возвращает имя объекта. Последовательно пытается извлечь имя из атрибутов
     '__qualname__', '__name__' и '__repr__'.
     """
-    return getattr(obj, "__qualname__", "") or getattr(obj, "__name__", "") or repr(obj)
+    return getattr(obj, "__qualname__", getattr(obj, "__name__", repr(obj)))
 
 
 # --------------------------------------------------------------------------------------

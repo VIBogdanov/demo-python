@@ -12,7 +12,6 @@ from typing import Any, Literal, Self, TypeAlias, cast, get_args
 
 import demo
 
-TRepeat: TypeAlias = int | str | float
 TLogger: TypeAlias = logging.Logger | str | None
 TTimerType: TypeAlias = Literal["Timer", "Call", "Total", "Best", "Average"]
 TAttrMode: TypeAlias = Literal["Public", "Private", "Protected"]
@@ -82,6 +81,7 @@ class _TimersTypes(ABC):
 
     def __set__(self, instance, value: Any) -> None:
         value = self.type_check(self._attr_name, value)
+        # print("__set__=", self._attr_name, "=", value)
         if self._attr_name == self._set_name:
             # Если имя атрибута управляемого класса и имя атрибута экземпляра совпадают,
             # то setattr приведет к зацикливанию, потому сохраняем через словарь
@@ -93,6 +93,7 @@ class _TimersTypes(ABC):
         # Если атрибут вызван из класса, возвращаем класс-дескриптор
         if instance is None:
             return self
+        # print("__get__=", self._attr_name)
         if self._attr_name == self._set_name:
             return instance.__dict__[self._attr_name]
         else:
@@ -114,7 +115,7 @@ class TypeChecker(_TimersTypes):
         # Тип можно задавать как, например: int или int() или 12
         if not isinstance(value, (self.expected_type, type(self.expected_type))):
             raise TimerTypeError(
-                f"Value for '{attr_name}' must be {self.expected_type}."
+                f"Value for '{attr_name}' must be {self.expected_type!r}."
             )
         # Вызываем super() для отработки множественного наследования
         return super().type_check(attr_name, value)
@@ -160,7 +161,7 @@ class TypeLogger(_TimersTypes):
     def __get__(self, instance, owner=None):
         try:
             return super().__get__(instance, owner)
-        except Exception:
+        except AttributeError:
             # Если логгер еще не был установлен, возвращаем дефолтовый
             return self._get_logger(type(instance).__name__)
 
@@ -298,7 +299,7 @@ class Timers:
         time_source: Callable = time.perf_counter,
         is_accumulate: bool = False,
         is_show: bool = True,
-        repeat: TRepeat = 1000,
+        repeat: int = 1000,
         # Позволяет перенаправить вывод тайминга. По-умолчанию вывод на консоль.
         logger: TLogger = None,
     ) -> None:
@@ -329,25 +330,20 @@ class Timers:
         В режимах "Total", "Best" и "Average" параметр is_accumulate игнорируется.
 
         Examples:
-            >>> instance(func, *args, **kwargs)
-            >>> instance(func, *args, **kwargs, timer='Best', repeat=100)
-            >>> instance(func, *args, **kwargs, time_source=time.process_time, is_show=False)
+            - instance(func, *args, **kwargs)
+            - instance(func, *args, **kwargs, timer='Best', repeat=100)
+            - instance(func, *args, **kwargs, time_source=time.process_time, is_show=False)
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
             *args (Any): Список позиционных аргументов для вызываемого объекта
             **kwargs (Any): Список именованных аргументов для вызываемого объекта
             timer (str): Какое время нужно измерит. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Call'
-            time_source (Callable): Функция, используемая для измерения времени. Default: self.time_source
-            repeat (int): Количество повторных запусков вызываемого объекта. Default: self.repeat
-            is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров. Default: self.is_accumulate
-            is_show (bool): Флаг, разрешающий вывод результатов измерений на консоль. Default: self.is_show
-            logger (Logger): Вывод результатов замеров в заданный поток. Default: self.logger
-
-        Raises:
-            result: Результат выполнения вызываемого объекта func.
-            RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
-            указанием имени вызываемого объекта и его аргументов.
+            time_source (Callable): Функция, используемая для измерения времени.
+            repeat (int): Количество повторных запусков вызываемого объекта.
+            is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров.
+            is_show (bool): Флаг, разрешающий вывод результатов измерений на консоль.
+            logger (Logger): Вывод результатов замеров в заданный поток.
 
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
@@ -362,6 +358,16 @@ class Timers:
         _attrs = {
             attr: kwargs.pop(attr, val) for attr, val in self._get_init_parameters()
         }
+        # Проверяем, что было мередано в методе __call__ для класса Timers
+        for attr_name, attr_val in _attrs.items():
+            # Вычисляем тип переданного значения. Это может быть либо дескриптор, либо обычный атрибут
+            attr_type = getattr(type(self), attr_name, type(getattr(self, attr_name)))
+            # У дескриптора должен быть метод 'type_check'
+            if hasattr(attr_type, "type_check"):
+                attr_type.type_check(attr_name, attr_val)
+            # Для обычного атрибута тип переданного значения в __call__ должен соответствовать типу из __init__
+            elif not isinstance(attr_val, attr_type):
+                raise TimerTypeError(f"Value for '{attr_name}' must be {attr_type!r}.")
         # Из полученного словаря формируем именованный кортеж для удобства
         _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
@@ -521,10 +527,21 @@ class Timers:
         """
         func_signature: inspect.Signature = inspect.signature(func)
         func_parameters = func_signature.parameters.keys()
+
         # Переупаковываем словарь именованных аргументов, оставляя только те, что заданы
-        # в сигнатуре вызываемого объекта, т.к. дополнительно в списке именованных
-        # аргументов могут присутствовать аргументы специфичные для класса Timers()
-        kwargs = {k: v for k, v in kwargs.items() if k in func_parameters}
+        # в сигнатуре вызываемого объекта
+        _kwargs = {k: v for k, v in kwargs.items() if k in func_parameters}
+
+        if len(kwargs) > len(_kwargs):
+            # Если в сигнатуру вызываемого объекта попали аргументы не принадлежащие
+            # вызываемому объекту, генерируем исключение
+            keys_unexpected = kwargs.keys() - _kwargs.keys()
+            arg_unexpected: str = ", ".join(
+                f"{arg_name}={kwargs[arg_name]!r}" for arg_name in keys_unexpected
+            )
+            raise TimerTypeError(
+                f"{demo.get_object_modname(func)}() got an unexpected keyword arguments: {arg_unexpected}"
+            )
 
         # Формируем строку аргументов и их значений, переданных в вызываемый объект
         try:
@@ -534,8 +551,8 @@ class Timers:
                     *args, **kwargs
                 ).arguments.items()
             )
-        except Exception:
-            _str = ""
+        except TypeError as exc:
+            raise TimerTypeError(f"{demo.get_object_modname(func)}() {exc}") from exc
         return _str
 
     def start(self) -> None:
@@ -565,7 +582,7 @@ class Timers:
             # Обрабатываем таймер. Аккумулируем, формируем лог и сохраняем
             _timer: TTimerType = "Timer"
             if self.is_accumulate:
-                _time += self.__timers.time(_timer)
+                _time += self.time(_timer)
             _log: str = f"{_timer} running time = {_time}"
             self.__timers.save(_timer, _time, _log)
 
@@ -601,11 +618,11 @@ class Timers:
         Поддерживается вызов таймера в качестве атрибута экземпляра класса.
 
         Например:
-        >>> instance.Timer
-        >>> instance.Call
-        >>> instance.Total
-        >>> instance.Best
-        >>> instance.Average
+        - instance.Timer
+        - instance.Call
+        - instance.Total
+        - instance.Best
+        - instance.Average
 
         что приведет к вызову метода instance.time() с заданным таймером (см. __getattr__)."""
         if timer == "Timer" and self.is_running:
@@ -744,7 +761,7 @@ class MiniTimers:
 if __name__ == "__main__":
     tmr = Timers()
 
-    def countdown(n, t=0):
+    def countdown(n):
         while n > 0:
             n -= 1
 
@@ -753,6 +770,6 @@ if __name__ == "__main__":
 
     # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    tmr(countdown, 50000, t=10, repeat=10, timer="Best")
-
+    # tmr(countdown, 50000, repeat=10, timer="Best")
+    # print(repr(tmr))
     pass
