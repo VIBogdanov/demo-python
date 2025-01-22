@@ -112,8 +112,8 @@ class TypeChecker(_TimersTypes):
         self.expected_type = (
             type(None) if self.expected_type is None else self.expected_type
         )
-        # Тип можно задавать как, например: int или int() или 12
-        if not isinstance(value, (self.expected_type, type(self.expected_type))):
+
+        if not isinstance(value, self.expected_type):
             raise TimerTypeError(
                 f"Value for '{attr_name}' must be {self.expected_type!r}."
             )
