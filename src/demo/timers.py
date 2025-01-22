@@ -358,16 +358,15 @@ class Timers:
         _attrs = {
             attr: kwargs.pop(attr, val) for attr, val in self._get_init_parameters()
         }
+
         # Проверяем, что было мередано в методе __call__ для класса Timers
         for attr_name, attr_val in _attrs.items():
-            # Вычисляем тип переданного значения. Это может быть либо дескриптор, либо обычный атрибут
-            attr_type = getattr(type(self), attr_name, type(getattr(self, attr_name)))
-            # У дескриптора должен быть метод 'type_check'
-            if hasattr(attr_type, "type_check"):
+            # Если для атрибута в классе Timers задан дескриптор с проверкой типа
+            if (
+                attr_type := getattr(type(self), attr_name, None)
+            ) is not None and hasattr(attr_type, "type_check"):
                 attr_type.type_check(attr_name, attr_val)
-            # Для обычного атрибута тип переданного значения в __call__ должен соответствовать типу из __init__
-            elif not isinstance(attr_val, attr_type):
-                raise TimerTypeError(f"Value for '{attr_name}' must be {attr_type!r}.")
+
         # Из полученного словаря формируем именованный кортеж для удобства
         _self = collections.namedtuple("SelfAttributes", _attrs.keys())(**_attrs)
 
@@ -475,6 +474,17 @@ class Timers:
 
         return _wrapper
 
+    def _get_attr_by_name(self, attr_name: str, not_defined: Any = None) -> Any:
+        return getattr(
+            self,
+            attr_name,
+            getattr(
+                self,
+                f"_{attr_name}",
+                getattr(self, f"_{type(self).__name__}__{attr_name}", not_defined),
+            ),
+        )
+
     def _get_init_parameters(
         self, empty_value: Any = None
     ) -> Iterator[tuple[str, Any]]:
@@ -497,7 +507,7 @@ class Timers:
                     attr,  # Атрибут: self.somename
                     getattr(
                         self,
-                        "_" + attr,  # Атрибут: self._somename
+                        f"_{attr}",  # Атрибут: self._somename
                         getattr(
                             self,
                             # Альтернатива:  f"_{self.__class__.__name__}__{arg}"
@@ -770,6 +780,6 @@ if __name__ == "__main__":
 
     # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    # tmr(countdown, 50000, repeat=10, timer="Best")
+    tmr(countdown, 50000, repeat=10, timer="Best")
     # print(repr(tmr))
     pass

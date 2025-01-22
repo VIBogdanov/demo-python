@@ -489,7 +489,7 @@ def rinda_multiplication(a: int, b: int) -> int:
     # Если оба <0 или >0, то sign = (-1)**False = (-1)**0 = 1
     sign: int = (-1) ** ((a < 0) ^ (b < 0))
 
-    def _get_addendum(a, b) -> Generator[int, None, None]:
+    def _get_addendum(a, b) -> Iterator[int]:
         """Внутренняя функция-генератор, которая выполняет попарное деление/умножение
         на 2, и фильтрует четные значения, полученные после деления на 2."""
         # Работаем с абсолютными целочисленными значениями
@@ -745,7 +745,7 @@ def string2number(
         # Иначе используем выражение по-умолчанию.
         if repattern:
             _pattern: str = repattern
-        elif isinstance(typenum, (complex, type(complex))):
+        elif typenum is complex:
             _num = r"(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
             # Шаблон для комплексных чисел ищет сочетание с 'j'
             _pattern = "[-+]?(?:"
@@ -755,13 +755,14 @@ def string2number(
         else:
             # Шаблон по-умолчанию
             _pattern = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
         # Компилируем шаблон для многократного использования
         rc: re.Pattern[str] = re.compile(_pattern)
         # Просматриваем все найденные числа в строке
         for snum in rc.finditer(data):
             try:
                 # Для int применимо понятие округления
-                if (isinstance(typenum, (int, type(int)))) and rounding:
+                if typenum is int and rounding:
                     _num = float(snum[0])
                     _num += -0.5 if _num < 0 else 0.5
                     yield int(_num)
