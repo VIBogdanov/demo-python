@@ -81,7 +81,7 @@ class _TimersTypes(ABC):
 
     def __set__(self, instance, value: Any) -> None:
         value = self.type_check(self._attr_name, value)
-        # print("__set__=", self._attr_name, "=", value)
+
         if self._attr_name == self._set_name:
             # Если имя атрибута управляемого класса и имя атрибута экземпляра совпадают,
             # то setattr приведет к зацикливанию, потому сохраняем через словарь
@@ -93,7 +93,7 @@ class _TimersTypes(ABC):
         # Если атрибут вызван из класса, возвращаем класс-дескриптор
         if instance is None:
             return self
-        # print("__get__=", self._attr_name)
+
         if self._attr_name == self._set_name:
             return instance.__dict__[self._attr_name]
         else:
@@ -109,13 +109,11 @@ class TypeChecker(_TimersTypes):
     expected_type: Any = None
 
     def type_check(self, attr_name: str, value: Any) -> Any:
-        self.expected_type = (
-            type(None) if self.expected_type is None else self.expected_type
-        )
-
-        if not isinstance(value, self.expected_type):
+        if not isinstance(
+            value, type(None) if self.expected_type is None else self.expected_type
+        ):
             raise TimerTypeError(
-                f"Value for '{attr_name}' must be {self.expected_type!r}."
+                f"Value for '{attr_name}' must be of type {demo.get_object_modname(self.expected_type)}."
             )
         # Вызываем super() для отработки множественного наследования
         return super().type_check(attr_name, value)
@@ -158,9 +156,9 @@ class TypeLogger(_TimersTypes):
             instance, value if value is not None else type(instance).__name__
         )
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance, cls_owner=None):
         try:
-            return super().__get__(instance, owner)
+            return super().__get__(instance, cls_owner)
         except AttributeError:
             # Если логгер еще не был установлен, возвращаем дефолтовый
             return self._get_logger(type(instance).__name__)
@@ -177,7 +175,7 @@ class TypeLogger(_TimersTypes):
                 value = self._get_logger(value)
             case _:
                 raise TimerTypeError(
-                    f"Value for '{attr_name}' must be logging.Logger or str."
+                    f"Value for '{attr_name}' must be of type logging.Logger or str."
                 )
         return super().type_check(attr_name, value)
 
@@ -310,7 +308,7 @@ class Timers:
         self.logger = logger
         # Класс-хранилище всех измеряемых показателей времени
         self.__timers: _TimersTime = _TimersTime()
-        # None - счетчик не запущен
+        # None - таймер не запущен
         self.__start_time: float | None = None
 
     def __call__(
@@ -359,7 +357,7 @@ class Timers:
             attr: kwargs.pop(attr, val) for attr, val in self._get_init_parameters()
         }
 
-        # Проверяем, что было мередано в методе __call__ для класса Timers
+        # Проверяем, что было передано в методе __call__ для класса Timers
         for attr_name, attr_val in _attrs.items():
             # Если для атрибута в классе Timers задан дескриптор с проверкой типа
             if (
@@ -546,11 +544,11 @@ class Timers:
             # Если в сигнатуру вызываемого объекта попали аргументы не принадлежащие
             # вызываемому объекту, генерируем исключение
             keys_unexpected = kwargs.keys() - _kwargs.keys()
-            arg_unexpected: str = ", ".join(
+            args_unexpected: str = ", ".join(
                 f"{arg_name}={kwargs[arg_name]!r}" for arg_name in keys_unexpected
             )
             raise TimerTypeError(
-                f"{demo.get_object_modname(func)}() got an unexpected keyword arguments: {arg_unexpected}"
+                f"{demo.get_object_modname(func)}() got an unexpected keyword arguments: {args_unexpected}"
             )
 
         # Формируем строку аргументов и их значений, переданных в вызываемый объект
@@ -652,6 +650,7 @@ class MiniTimers:
         timer (str): Какое время нужно вычислить. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Call'
         time_source (Callable): Функция, используемая для измерения времени. Default: time.perf_counter
         repeat (int): Количество повторных запусков вызываемого объекта. Default: 1000
+        logger (Logger | None): Логирование результатов замеров. Default: None
 
     Raises:
         RuntimeError: Если во время вызова исполняемого объекта произошла ошибка, генерируется исключение с
@@ -661,6 +660,9 @@ class MiniTimers:
         Any: Результат, возвращаемый вызываемым объектом.
     """
 
+    time_source = TypeCallable()
+    repeat = TypePosInteger()
+
     def __init__(
         self,
         func: Callable | None = None,
@@ -668,11 +670,13 @@ class MiniTimers:
         timer: TTimerType = "Call",
         time_source: Callable = time.perf_counter,
         repeat: int = 1000,
+        logger: logging.Logger | None = None,
         **kwds: Any,
     ) -> None:
         self.timer: TTimerType = timer
-        self.time_source: Callable = time_source
-        self.repeat: int = repeat
+        self.time_source = time_source
+        self.repeat = repeat
+        self.logger: logging.Logger | None = logger
         self.__result: Any = None
         self.__time: float = float("inf")
         self.__func_signature: str = ""
@@ -702,6 +706,10 @@ class MiniTimers:
                 except Exception as exc:
                     raise RuntimeError(f"Call error {self.__func_signature}") from exc
 
+        if self.logger is not None:
+            # Если логгер задан, отправляем ему результат замеров
+            self.logger.info(self.log)
+
         return self.result
 
     def __repr__(self) -> str:
@@ -712,6 +720,7 @@ class MiniTimers:
                 f", timer={self.timer!r}",
                 f", time_source={demo.get_object_modname(self.time_source)}",
                 f", repeat={self.repeat!r}",
+                f", logger={self.logger!r}",
                 ")",
             )
         )
@@ -770,6 +779,7 @@ class MiniTimers:
 
 if __name__ == "__main__":
     tmr = Timers()
+    minitmr = MiniTimers(repeat=10, timer="Best")
 
     def countdown(n):
         while n > 0:
@@ -778,8 +788,10 @@ if __name__ == "__main__":
     def listcomp(N):
         [х * 2 for х in range(N)]
 
-    # print(MiniTimers(countdown, 50000, repeat=1000, timer="Best"))
+    # print(MiniTimers(countdown, 50000, repeat=10, timer="Best"))
+    # minitmr(countdown, 50000)
+    # print(minitmr)
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    tmr(countdown, 50000, repeat=10, timer="Best")
+    # tmr(countdown, 50000, repeat=10, timer="Best")
     # print(repr(tmr))
     pass

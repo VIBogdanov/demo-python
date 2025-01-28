@@ -514,7 +514,7 @@ def inumber_to_digits(number: Any) -> Iterator[int]:
         number (Any): Заданное целое число.
 
     Returns:
-        Iterator[int]: Список цифр.
+        Iterator[int]: Итератор списка цифр.
 
     Example:
         >>> inumber_to_digits(7362) -> [7, 3, 6, 2]
@@ -526,7 +526,7 @@ def inumber_to_digits(number: Any) -> Iterator[int]:
     except Exception as exc:
         raise ValueError(f"impossible to represent {number} as an integer") from exc
 
-    def get_digits(num: int) -> Generator[int, Any, None]:
+    def get_digits(num: int) -> Iterator[int]:
         yield num % 10
         while num := num // 10:
             yield num % 10
@@ -538,7 +538,7 @@ def inumber_to_digits(number: Any) -> Iterator[int]:
 
 
 # -------------------------------------------------------------------------------------------------
-def inumber_to_digits2(number: Any) -> tuple[int, ...]:
+def inumber_to_digits2(number: Any) -> Iterator[int]:
     """Функция преобразования целого числа в список цифр.
     Альтернативный вариант. Используется итератор для генерации цифр.
 
@@ -546,7 +546,7 @@ def inumber_to_digits2(number: Any) -> tuple[int, ...]:
         number (Any): Заданное целое число.
 
     Returns:
-        tuple[int]: Список цифр.
+        Iterator[int]: Итератор списка цифр.
     """
     try:
         number = int(number)
@@ -563,7 +563,7 @@ def inumber_to_digits2(number: Any) -> tuple[int, ...]:
         return get_digits.num[1] if get_digits.num != (0, 0) else None
 
     # Итератор вызывает функцию до тех пор, пока не получит None
-    return (*iter(get_digits, None),)[::-1]
+    return reversed((*iter(get_digits, None),))
 
 
 # -------------------------------------------------------------------------------------------------
@@ -637,7 +637,7 @@ def unpack2flat(
     while iters_buff:
         # В последней позиции хранится распаковываемый в данный момент итератор
         for obj in iters_buff[-1]:
-            # Если это вложенный итерируемый объект (но не строка)
+            # Если это вложенный итерируемый объект (кроме строк и исключений)
             if not isinstance(obj, DO_NOT_ITERATE) and (
                 # Iterable проверяет наличие только метода "__iter__"
                 isinstance(obj, Iterable) or hasattr(obj, "__getitem__")
