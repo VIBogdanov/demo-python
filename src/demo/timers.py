@@ -458,6 +458,7 @@ class Timers:
 
         Например:
 
+        >>> @Timers().register
         >>> @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).register
         Альтернатива, предварительно создать экземпляр класса Timers, настроить необходимые параметры и
         использовать экземпляр как декоратор:
@@ -640,8 +641,8 @@ class Timers:
 
 class MiniTimers:
     """Вычисляет время выполнения заданной функции с аргументами за N повторов (по-умолчанию N=1000).
-    Мини версия класса Timers без ручного таймера, без декоратора, без менеджера контекста, без аккумулирования.
-    Сохраняет результаты только последнего вызова.
+    Мини версия класса Timers без ручного таймера, без декоратора, без менеджера контекста, без
+    аккумулирования результатов замеров. Сохраняет результаты только последнего вызова.
 
     Args:
         func (Callable): Вызываемый объект для замера времени выполнения. Default: None
@@ -702,6 +703,7 @@ class MiniTimers:
                 self.__best_time(func, args, kwds)
             case _:
                 try:
+                    self.__time = float("inf")
                     return func(*args, **kwds)
                 except Exception as exc:
                     raise RuntimeError(f"Call error {self.__func_signature}") from exc

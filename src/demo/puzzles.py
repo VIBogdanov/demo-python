@@ -825,66 +825,59 @@ def get_max_lenseq_symbol(sequence: Iterable[TAny], symbol: TAny) -> int:
 
 
 # -------------------------------------------------------------------------------------------------
-def combi_range(data: Iterable, is_join=False) -> Generator[tuple[Any, Any], Any, None]:
+def combi_ranges(data: Iterable, is_join=False) -> Iterator[tuple[Any, Any]]:
     """Из списка диапазонов комбинирует пересекающиеся или примыкающие друг к другу диапазоны.
     При этом формируются диапазоны с минимальным и максимальным индексом. Если флаг is_join
     установлен, то в результирующий диапазон комбинируются как пересекающиеся, так и
     примыкающие диапазоны. Иначе только пересекающиеся - по-умолчанию.
 
     Example:
-        [(1,3), (2,4), (4,5)] -> [(1,4), (4,5)] (is_join=False)
+        >>> combi_range([(1,3), (2,4), (4,5)], is_join=False) -> [(1,4), (4,5)]
 
-        [(1,3), (2,4), (4,5)] -> [(1,5)] (is_join=True)
+        >>> combi_range([(1,3), (2,4), (4,5)], is_join=True) -> [(1,5)]
 
     Args:
         data (Iterable): Список диапазонов в виде пар начального и конечного индекса
-        is_join (bool, optional): Флаг - комбинировать только пересекающиеся или примыкающие диапазоны. Defaults to False.
+        is_join (bool): Флаг - комбинировать только пересекающиеся или примыкающие диапазоны. Defaults to False.
 
-    Yields:
-        Generator([tuple[Any, Any], Any, None]): Генерирует скомбинированные диапазоны.
+    Return:
+        Iterator[tuple[Any, Any]]: Генерирует скомбинированные диапазоны.
     """
     dict_data = dict()
     # Список пар конвертируем в словарь. Ключ - начало диапазона, значение - конец.
     # Заодно решаем проблему поглощения и дублирования диапазонов. Например: [2,4] поглощает [2,3]
-    dict_data = dict(
-        (key, val) for key, val in data if key not in dict_data or val > dict_data[key]
-    )
-    # Стартуем с диапазона с минимальным стартовым ключом. None - если словарь пуст
-    while (start_range := min(dict_data.keys(), default=None)) is not None:
-        if is_join:
-            # В next_start_range хранится начало уже обработанного диапазона дабы
-            # избежать зацикливания
-            max_range, next_start_range = dict_data.pop(start_range), start_range
-            # Ищем все диапазоны, которые пересекаются или сливаются друг с другом
-            # Из найденных диапазонов отбираем диапазон с максимальным конечным значением
-            # Создание поверхностной копии позволяет одновременно итерировать словарь и
-            # изымать из него значения, уменьшая его размер на каждой итерации
-            while next_start_range is not None:
-                max_range, next_start_range = max(
-                    (
-                        (dict_data.pop(key), key)
-                        for key in dict_data.copy().keys()
-                        if key > next_start_range and key <= max_range
-                    ),
-                    default=(max_range, None),
-                )
-        else:
-            # Получаем конец текущего диапазона
-            # Т.к. в дальнейшем текущий диапазон не понадобится, изымаем его из словаря
-            # дабы уменьшить поисковую базу в будущем
-            end_range = dict_data.pop(start_range)
-            # Ищем перекрывающийся с текущим диапазон с максимальным конечным значением
-            # Если найти не удалось, используем конечное значение текущего диапазона
-            max_range = max(
+    for start_range, end_range in data:
+        if start_range not in dict_data.keys() or end_range > dict_data[start_range]:
+            dict_data[start_range] = end_range
+
+    # Внутренняя функция-генератор, которая ищет пересекающиеся и\или примыкающие диапазоны
+    # для заданного конечного индекса и возвращает максимальный конечный индекс найденных диапазонов
+    def get_end_range(end_range: Any, is_join: bool = False) -> Iterator[Any]:
+        while end_range is not None:
+            yield end_range
+            # Из всех найденных диапазонов для текущего конечного индекса,
+            # отбираем максимальный конечный индекс, который становиться текущим
+            # и повторяем итерацию поиска
+            end_range = max(
                 (
-                    dict_data.pop(key)
-                    for key in dict_data.copy().keys()
-                    if key > start_range and key <= end_range
+                    dict_data.pop(start_range)
+                    # Создание копии ключей позволяет одновременно итерировать словарь и
+                    # изымать из него значения, уменьшая его размер на каждой итерации
+                    for start_range in set(dict_data.keys())
+                    if (
+                        # Учитываем персечение и примыкание диапазонов
+                        start_range <= end_range if is_join else start_range < end_range
+                    )
                 ),
-                default=end_range,
+                default=None,  # Если не удалось найти подходящие диапазоны. Это останавливает генератор
             )
 
-        yield start_range, max_range
+    # Каждая итерация начинается с диапазона с минимальным начальным индексом
+    while (start_range := min(dict_data.keys(), default=None)) is not None:
+        yield (
+            start_range,
+            max(get_end_range(dict_data.pop(start_range, None), is_join)),
+        )
 
 
 # -------------------------------------------------------------------------------------------------
@@ -907,7 +900,7 @@ def main():
     )
 
     print("\n- Олимпиадная задача. См. описание в puzzles.py.")
-    print(f" get_pagebook_number(27, 2, [8,0]) -> {get_pagebook_number(27, 2, [8,0])}")
+    print(f" get_pagebook_number(27, 2, [8,0]) -> {get_pagebook_number(27, 2, [8, 0])}")
 
     print("\n- Получить число, максимально близкое к числу X, из суммы чисел массива.")
     print(f" closest_amount([20, 30, 38], 112) -> {closest_amount([20, 30, 38], 112)}")
@@ -953,6 +946,16 @@ def main():
     )
     print(
         f" get_max_lenseq_symbol('AAAAANNNKKKAAAAALLLAAAAAAAAAA', 'A') -> {get_max_lenseq_symbol('AAAAANNNKKKAAAAALLLAAAAAAAAAA', 'A')}"
+    )
+
+    print(
+        "\n- Из списка диапазонов комбинирует пересекающиеся или примыкающие друг к другу диапазоны."
+    )
+    print(
+        f" combi_ranges([(1,3), (2,4), (2,3), (4,5)], is_join=False) -> {list(combi_ranges([(1, 3), (2, 4), (2, 3), (4, 5)], is_join=False))}"
+    )
+    print(
+        f" combi_ranges([(1,3), (2,4), (2,3), (4,5)], is_join=True) -> {list(combi_ranges([(1, 3), (2, 4), (2, 3), (4, 5)], is_join=True))}"
     )
 
 

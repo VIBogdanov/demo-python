@@ -144,7 +144,7 @@ def get_phrase(
             # Просто добавляем список всех слов поисковой фразы. Комбинировать не нужно
             phrase_combo_words.append(set(word.lower() for word in phrase_words_clear))
 
-    # В последнем случае (CompareType.All) посисковая фраза не используется. Возвращаем пустой список
+    # В случае (CompareType.All) посисковая фраза не используется. Возвращаем пустой список
     return Phrase(phrase_combo_words, compare_type)
 
 
