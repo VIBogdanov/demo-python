@@ -414,7 +414,7 @@ class Timers:
         # с текущими значениями параметров, а не с переданными в момент инициализации.
         return "".join(
             (
-                f"{type(self).__name__}(",
+                f"{demo.get_object_modname(type(self))}(",
                 ", ".join(
                     # Отбираем те параметры, которые удалось идентифицировать
                     f"{attr} = {demo.get_object_modname(value)}"
@@ -462,7 +462,7 @@ class Timers:
         >>> @Timers(time.process_time, is_accumulate=True, is_show=False, logger=MyLogger).register
         Альтернатива, предварительно создать экземпляр класса Timers, настроить необходимые параметры и
         использовать экземпляр как декоратор:
-        >>> @instance.register.
+        >>> @instance.register
 
         Параметр repeat для декоратора не используется и игнорируется.
         """
@@ -509,7 +509,7 @@ class Timers:
                         f"_{attr}",  # Атрибут: self._somename
                         getattr(
                             self,
-                            # Альтернатива:  f"_{self.__class__.__name__}__{arg}"
+                            # Альтернатива:  f"_{self.__class__.__name__}__{attr}"
                             f"_{type(self).__name__}__{attr}",  # Атрибут: self.__somename
                             val.default  # Значение переданное в __init__
                             if val.default is not val.empty
@@ -783,10 +783,11 @@ if __name__ == "__main__":
     tmr = Timers()
     minitmr = MiniTimers(repeat=10, timer="Best")
 
-    def countdown(n):
+    def countdown(n: int):
         while n > 0:
             n -= 1
 
+    @Timers().register
     def listcomp(N):
         [х * 2 for х in range(N)]
 
@@ -795,5 +796,6 @@ if __name__ == "__main__":
     # print(minitmr)
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
     # tmr(countdown, 50000, repeat=10, timer="Best")
+    # listcomp(10000)
     # print(repr(tmr))
     pass

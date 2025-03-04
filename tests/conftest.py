@@ -1,3 +1,6 @@
+from collections.abc import Generator
+from typing import Any
+
 import pytest
 
 #  ------------------- test_find_nearest_number ------------------------------------
@@ -42,72 +45,52 @@ numbers_list: list[dict] = [
 ]
 
 
-def _get_numbers_list() -> list[dict]:
-    return (
-        [
-            {
-                **item,
-                **{
-                    "result": item["result_prev"],
-                    "position": POSITION_PREV,
-                    "ids": str(item["result_prev"]) + " << " + str(item["number"]),
-                },
-            }
-            for item in numbers_list
-        ]
-        + [
-            {
-                **item,
-                **{
-                    "number": (item["number"] * -1),
-                    "result": None
-                    if item["result_next"] is None
-                    else (item["result_next"] * -1),
-                    "position": POSITION_PREV,
-                    "ids": "-"
-                    + str(item["result_next"])
-                    + " << -"
-                    + str(item["number"]),
-                },
-            }
-            for item in numbers_list
-        ]
-        + [
-            {
-                **item,
-                **{
-                    "result": item["result_next"],
-                    "position": POSITION_NEXT,
-                    "ids": str(item["number"]) + " >> " + str(item["result_next"]),
-                },
-            }
-            for item in numbers_list
-        ]
-        + [
-            {
-                **item,
-                **{
-                    "number": (item["number"] * -1),
-                    "result": None
-                    if item["result_prev"] is None
-                    else (item["result_prev"] * -1),
-                    "position": POSITION_NEXT,
-                    "ids": "-"
-                    + str(item["number"])
-                    + " >> -"
-                    + str(item["result_prev"]),
-                },
-            }
-            for item in numbers_list
-        ]
-    )
+def _get_numbers_list() -> Generator[dict[str, Any], Any, None]:
+    for item in numbers_list:
+        res = {
+            "number": (_number := item["number"]),
+            "result": (_result := item["result_prev"]),
+            "position": POSITION_PREV,
+            "ids": f"{_result} << {_number}",
+        }
+        yield res
+
+        res = res | {
+            "result": (_result := item["result_next"]),
+            "position": POSITION_NEXT,
+            "ids": f"{res['number']} >> {_result}",
+        }
+        yield res
+
+        res = res | {
+            "number": (_number := (item["number"] * -1)),
+            "result": (
+                _result := None
+                if item["result_next"] is None
+                else (item["result_next"] * -1)
+            ),
+            "position": POSITION_PREV,
+            "ids": f"{_result} << {_number}",
+        }
+        yield res
+
+        res = res | {
+            "result": (
+                _result := None
+                if item["result_prev"] is None
+                else (item["result_prev"] * -1)
+            ),
+            "position": POSITION_NEXT,
+            "ids": f"{res['number']} >> {_result}",
+        }
+        yield res
 
 
 @pytest.fixture(
     name="numbers_int",
     scope="module",
     params=_get_numbers_list(),
-    ids=lambda item: str(item["ids"]),
+    ids=lambda item: item["ids"],
 )
 def fixture_numbers_list_int(request) -> dict:
     return request.param
