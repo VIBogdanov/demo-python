@@ -92,7 +92,7 @@ def _get_numbers_list() -> Generator[dict[str, Any], Any, None]:
     params=_get_numbers_list(),
     ids=lambda item: item["ids"],
 )
-def fixture_numbers_list_int(request) -> dict:
+def fixture_numbers_list_int(request) -> dict[str, Any]:
     return request.param
 
 

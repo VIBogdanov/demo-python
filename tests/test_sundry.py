@@ -32,19 +32,29 @@ class TestFindIntervals:
 
 class TestFindNearestNumber:
     def test_find_nearest_number_int(self, numbers_int, arguments_list, capsys):
-        param_str = "\n"
+        first_line = "\n"
+        _number = numbers_int["number"]
         for arguments in arguments_list(numbers_int["position"]):
-            res = find_nearest_number(numbers_int["number"], **arguments)
-            param_str = "".join([param_str, f'number={numbers_int["number"]}, '])
-            for param_name, param_val in arguments.items():
-                param_str = "".join([param_str, f"{param_name}={param_val}, "])
+            res = find_nearest_number(_number, **arguments)
             with capsys.disabled():
-                print("".join([param_str, f"result = {res}"]))
-            param_str = ""
-            if numbers_int["result"] is None:
-                assert res is numbers_int["result"]
+                print(
+                    "".join(
+                        (
+                            f"{first_line}find_nearest_number({_number}",
+                            *(
+                                f", {param_name}={param_val}"
+                                for param_name, param_val in arguments.items()
+                            ),
+                            f") -> {res}",
+                        )
+                    )
+                )
+                first_line = ""
+
+            if (_res := numbers_int["result"]) is None:
+                assert res is _res
             else:
-                assert res == numbers_int["result"]
+                assert res == _res
 
     def test_find_nearest_number_str(self, numbers_int, arguments_list, capsys):
         numbers_int["number"] = str(numbers_int["number"])
