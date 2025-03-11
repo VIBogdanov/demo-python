@@ -60,10 +60,21 @@ class TestFindNearestNumber:
         numbers_int["number"] = str(numbers_int["number"])
         self.test_find_nearest_number_int(numbers_int, arguments_list, capsys)
 
-    def test_find_nearest_number_invalid_parameters(self):
-        assert find_nearest_number("abc") is None
-        assert find_nearest_number("812abc") is None
-        assert find_nearest_number("153.12") is None
-        assert find_nearest_number(153.72) == 135
-        assert find_nearest_number(b"number") is None
-        assert find_nearest_number(None) is None
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ("abc", None),
+            ("812abc", None),
+            ("153.12", None),
+            (153.12, 135),
+            (b"number", None),
+            (None, None),
+        ],
+        ids=lambda item: f"find_nearest_number({repr(item[0])}) -> {item[1]}",
+    )
+    def test_find_nearest_number_invalid_parameters(self, args):
+        arg, res = args
+        if res is None:
+            assert find_nearest_number(arg) is res
+        else:
+            assert find_nearest_number(arg) == res

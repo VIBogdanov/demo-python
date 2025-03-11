@@ -10,10 +10,10 @@ POSITION_NEXT = "next"
 
 @pytest.fixture(
     name="arguments_list",
-    scope="module",
+    scope="class",
 )
 def fixture_arguments_list():
-    def _fixture_arguments_list(position=POSITION_PREV) -> list[dict]:
+    def _fixture_arguments_list(position=POSITION_PREV) -> list[dict[str, Any]]:
         if position == POSITION_PREV:
             return [
                 {},
@@ -88,7 +88,7 @@ def _get_numbers_list() -> Generator[dict[str, Any], Any, None]:
 
 @pytest.fixture(
     name="numbers_int",
-    scope="module",
+    scope="class",
     params=_get_numbers_list(),
     ids=lambda item: item["ids"],
 )
