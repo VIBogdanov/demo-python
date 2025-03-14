@@ -315,7 +315,6 @@ class Timers:
         self,
         func: Callable,
         *args: Any,
-        timer: TTimerType = "Call",
         **kwargs: Any,
     ) -> Any:
         """Вычисляет время выполнения заданной функции с аргументами за N повторов.
@@ -328,15 +327,15 @@ class Timers:
         В режимах "Total", "Best" и "Average" параметр is_accumulate игнорируется.
 
         Examples:
-            - instance(func, *args, **kwargs)
-            - instance(func, *args, **kwargs, timer='Best', repeat=100)
-            - instance(func, *args, **kwargs, time_source=time.process_time, is_show=False)
+            >>> instance(func, *args, **kwargs)
+            >>> instance(func, *args, **kwargs, timer='Best', repeat=100)
+            >>> instance(func, *args, **kwargs, time_source=time.process_time, is_show=False)
 
         Args:
             func (Callable): Вызываемый объект для замера времени выполнения
-            *args (Any): Список позиционных аргументов для вызываемого объекта
-            **kwargs (Any): Список именованных аргументов для вызываемого объекта
-            timer (str): Какое время нужно измерит. Total-общее, Best-лучшее, Average-среднее. Timer и Call - однократный вызов. Default: 'Call'
+            *args (Any): Перечень позиционных аргументов для вызываемого объекта
+            **kwargs (Any): Перечень именованных аргументов для вызываемого объекта
+            timer (str): Какое время нужно измерит. Total-общее, Best-лучшее, Average-среднее, Call - однократный вызов. Default: 'Call'
             time_source (Callable): Функция, используемая для измерения времени.
             repeat (int): Количество повторных запусков вызываемого объекта.
             is_accumulate (bool): Флаг, активирующий режим аккумулирования замеров.
@@ -346,6 +345,9 @@ class Timers:
         Returns:
             Any: Результат, возвращаемый вызываемым объектом.
         """
+        # Определяем таймер, который нужно измерить, из kwargs метода __call__.
+        # Если таймер не задан, устанавливаем по-умолчанию - Call
+        _timer: TTimerType = kwargs.pop("timer", "Call")
         # Формируем список параметров, которые передаются в метод __init__.
         # Для каждого из параметров выполняем три шага:
         # - пытаемся получить значение из входных параметров метода __call__ из kwargs
@@ -373,20 +375,20 @@ class Timers:
         _time: float = float("inf")
 
         try:
-            match timer:
+            match _timer:
                 case "Timer" | "Call":
                     _time = _self.time_source()
                     result = func(*args, **kwargs)
                     _time = _self.time_source() - _time
                     if _self.is_accumulate:
-                        _time += self.time(timer)
+                        _time += self.time(_timer)
                 case "Total" | "Average":
                     _time = _self.time_source()
                     # itertools.repeat быстрее range
                     for _ in repeat(None, _self.repeat):
                         result = func(*args, **kwargs)
                     _time = _self.time_source() - _time
-                    if timer == "Average":
+                    if _timer == "Average":
                         _time = _time / _self.repeat
                 case "Best":
                     for _ in repeat(None, _self.repeat):
@@ -400,8 +402,8 @@ class Timers:
         except Exception as exc:
             raise TimerCallError(f"Call error {func_signature}") from exc
         else:
-            _log: str = f"{timer} time [{func_signature} -> {result}] = {_time}"
-            self.__timers.save(timer, _time, _log)
+            _log: str = f"{_timer} time [{func_signature} -> {result}] = {_time}"
+            self.__timers.save(_timer, _time, _log)
             if _self.is_show:
                 _self.logger.info(_log)
 
@@ -469,7 +471,7 @@ class Timers:
 
         @functools.wraps(func)
         def _wrapper(*args: Any, **kwargs: Any) -> Any:
-            return self(func, *args, **kwargs, timer="Call")
+            return self(func, *args, **kwargs)
 
         return _wrapper
 
@@ -795,7 +797,7 @@ if __name__ == "__main__":
     # minitmr(countdown, 50000)
     # print(minitmr)
     # tmr(listcomp, 1000000, repeat=10, timer="Best")
-    # tmr(countdown, 50000, repeat=10, timer="Best")
+    tmr(countdown, 50000, repeat=10, timer="Average")
     # listcomp(10000)
     # print(repr(tmr))
     pass
