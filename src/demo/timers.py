@@ -106,6 +106,10 @@ class _TimersTypes(ABC):
 
 
 class TypeChecker(_TimersTypes):
+    """Обобщенный класс проверки типа атрибута. Реализует универсальный метод type_check().
+    Для проверки конкретного типа, достаточно унаследовать от TypeChecker и задать тип в expected_type.
+    """
+
     expected_type: Any = None
 
     def type_check(self, attr_name: str, value: Any) -> Any:

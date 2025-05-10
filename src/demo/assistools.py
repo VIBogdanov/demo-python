@@ -815,3 +815,13 @@ if __name__ == "__main__":
     # print(MiniTimers(is_sorted, data, timer="Best", repeat=10))
 
     main()
+
+    def _iter():
+        for i in range(10):
+            yield i
+
+    irange = range(10)
+    i_it = _iter()
+    # print(ilen(i_it))
+    print(list(i_it))
+    # print(list(irange))
