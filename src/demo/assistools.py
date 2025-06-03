@@ -617,7 +617,7 @@ def unpack2flat(
     """
     # Строки и байты не считаем за итерируемые объекты
     _not_unpack = [*ignore]
-
+    # Разбираем список объектов, которые не нужно распаковывать
     match not_unpack:
         case str():
             for _obj_name in re.split(r"\W+", not_unpack):
