@@ -208,12 +208,11 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     Returns:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
-    len_lastdig: int = demo.ilen(digits)
-    if (count <= 0) or (pages < count) or (len_lastdig == 0):
+    if (count <= 0) or (pages < count):
         return 0
 
     # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
-    # При  этом из списка digits удаляем дубликаты
+    # При этом из списка digits удаляем дубликаты
     # Полученный список обязательно должен быть отсортирован в обратном порядке
     try:
         start_pages = sorted(
@@ -222,12 +221,15 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
     except (ValueError, TypeError):
         return 0
 
-    # Вычисляем позицию числа, которое соответствует смещению count
-    idx: int = (count % len_lastdig) - 1
-    # Т.к. последующая последняя цифра повторяется через 10,
-    # вычисляем множитель с учетом уже вычисленных значений
-    multiplier: int = (count - 1) // len_lastdig
-    return start_pages[idx] - (multiplier * 10)
+    if (pages_count := len(start_pages)) == 0:
+        return 0
+    else:
+        # Вычисляем позицию числа, которое соответствует смещению count
+        idx: int = (count % pages_count) - 1
+        # Т.к. последующая последняя цифра повторяется через 10,
+        # вычисляем множитель с учетом уже вычисленных значений
+        multiplier: int = (count - 1) // pages_count
+        return start_pages[idx] - (multiplier * 10)
 
 
 # -------------------------------------------------------------------------------------------------
