@@ -4,7 +4,7 @@ import math
 from collections import Counter, defaultdict, deque
 from collections.abc import Generator, Hashable, Iterable, Iterator
 from enum import Enum
-from itertools import chain, groupby, permutations
+from itertools import chain, count, groupby, permutations
 from typing import Any, Literal, NamedTuple, TypeAlias, TypeVar, cast
 
 # Должно быть так: from .assistools import ilen
@@ -209,27 +209,25 @@ def get_pagebook_number(pages: int, count: int, digits: Iterable[int]) -> int:
         int: Номер искомой страницы или 0 в случае безуспешного поиска
     """
     len_lastdig: int = demo.ilen(digits)
-    if (count <= 0) and (pages < count) and (len_lastdig == 0):
-        return 0
-
-    # Создаем копию и попутно удаляем дубликаты
-    try:
-        last_digits: list[int] = list(set(digits))
-    except (ValueError, TypeError):
+    if (count <= 0) or (pages < count) or (len_lastdig == 0):
         return 0
 
     # Формируем список с ближайшими меньшими числами, оканчивающиеся на цифры из списка digits
-    for i in range(len_lastdig):
-        last_digits[i] = (pages - last_digits[i]) // 10 * 10 + last_digits[i]
-
+    # При  этом из списка digits удаляем дубликаты
     # Полученный список обязательно должен быть отсортирован в обратном порядке
-    last_digits.sort(reverse=True)
+    try:
+        start_pages = sorted(
+            ((pages - ld) // 10 * 10 + ld for ld in set(digits)), reverse=True
+        )
+    except (ValueError, TypeError):
+        return 0
+
     # Вычисляем позицию числа, которое соответствует смещению count
     idx: int = (count % len_lastdig) - 1
     # Т.к. последующая последняя цифра повторяется через 10,
     # вычисляем множитель с учетом уже вычисленных значений
     multiplier: int = (count - 1) // len_lastdig
-    return last_digits[idx] - (multiplier * 10)
+    return start_pages[idx] - (multiplier * 10)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -453,7 +451,7 @@ def get_incremental_list(digits: Iterable[int]) -> tuple[int, list[int], list]:
     # Генератор чисел, которые нужно подставить,
     # чтобы получить возрастающий список.
     missing_digits: Generator[int, None, None] = (
-        n for n in range(begin, end + 1) if n not in elements_used
+        n for n in count(begin) if n not in elements_used
     )
     # Проверяем каждое значение списка: если значение не входит
     # в результирующий диапазон или продублировано, заменяем его
@@ -859,6 +857,7 @@ def combi_ranges(data: Iterable, is_join=False) -> Iterator[tuple[Any, Any]]:
             # отбираем максимальный конечный индекс, который становиться текущим
             # и повторяем итерацию поиска
             end_range = max(
+                # Внутри функции max запускаем генератор, отбирающий конечные индексы
                 (
                     dict_data.pop(start_range)
                     # Создание копии ключей позволяет одновременно итерировать словарь и
